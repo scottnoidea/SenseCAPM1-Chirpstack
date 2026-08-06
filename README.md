@@ -11,7 +11,7 @@ Built for people who still have the hardware, but not the Helium wallet keys —
 
 **Hardware:** SenseCAP M1 = RPi 4 + Semtech SX1302 (WM1302) or SX1303 (WM1303) over SPI.
 
-**Current release:** **v2.0.0** — Trixie support, ChirpStack 4, CI, install helpers. See [CHANGELOG.md](CHANGELOG.md).
+**Current release:** [**v2.0.0**](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/releases/tag/v2.0.0) — Trixie support, ChirpStack 4, CI, install helpers. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
