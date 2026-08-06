@@ -1,9 +1,9 @@
-# SenseCAP M1 → ChirpStack
+# SenseCAP M1 ChirpStack
 
 > **That HNT mining box you bought in the boom years?**  
-> Under the plastic it’s still a Raspberry Pi 4 + a perfectly good LoRa concentrator.  
+> Under the metal case it’s still a Raspberry Pi 4 + a perfectly good LoRa concentrator.  
 > If your seed is safe, go mine (or don’t). This repo isn’t for you.  
-> If the seed is gone — welcome to the “expensive brick, salvageable radio” club.
+> If the seed is gone. welcome to the “expensive brick, salvageable radio” club.
 
 Turn a **Seeed SenseCAP M1** (RPi 4 + WM1302/WM1303) into a private [ChirpStack](https://www.chirpstack.io) LoRaWAN gateway + network server.  
 No token charts. No epoch anxiety. Just packets you actually own.
@@ -13,7 +13,7 @@ No token charts. No epoch anxiety. Just packets you actually own.
 | **`main`** (you are here) | **Raspberry Pi OS on Debian 13 Trixie** — use this |
 | [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) | Still on Bookworm (Debian 12) — we didn’t ghost you, we just stopped living there |
 
-**What’s in the tin:** RPi 4 + Semtech SX1302 (WM1302) or SX1303 (WM1303) on SPI.  
+**What’s in the enclosure:** RPi 4 + Semtech SX1302 (WM1302) or SX1303 (WM1303) on SPI.  
 Yes, you paid “gateway money” for a Pi in a nicer shell. The upside: **it still boots Linux.**
 
 ---
@@ -23,26 +23,26 @@ Yes, you paid “gateway money” for a Pi in a nicer shell. The upside: **it st
 **There is no recovery.**  
 Not “open a ticket.” Not “maybe support has a backdoor.” Not “my cousin knows a guy.”  
 The app was loud about this. They even shipped a card so you’d write the words down.  
-If that card is now a coaster — that’s on you.
+If that card is now a coaster. that’s on you.
 
 Official yellow warning box (read it, then stop bargaining with the universe):  
 https://docs.helium.com/wallets/wallet-seed-phrase
 
 Silver lining (the snarky kind):  
 SPI still works. The concentrator still works. Linux still works.  
-HNT might have left the chat, but **LoRaWAN didn’t** — and this time *you* run the LNS.
+HNT might have left the chat, but **LoRaWAN didn’t** and this time *you* run the LNS.
 
 ### What you need before the complaining starts
 
 1. A SenseCAP M1 (lost keys / retired miner / “I want a real gateway”)  
 2. Basic Linux CLI (copy-paste counts)  
 3. A microSD reader  
-4. A decent SD card — buy the cheapest flea-market special and cry about corruption later if you insist  
-5. Time, coffee, and a mild acceptance of consequences  
+4. A decent SD card - buy the cheapest flea-market special and cry about corruption later if you insist  
+5. Your time, beers and a mild acceptance of consequences  
 
 ---
 
-## 1. Flash the OS — it’s Trixie now; stop hoarding 2023 images
+## 1. Flash the OS - it’s Trixie now; stop hoarding 2023 images
 
 Grab [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 
@@ -78,7 +78,7 @@ Under **Interface Options**, enable:
 - **Serial Port** (login shell: No / hardware serial: Yes, if asked)  
 - **VNC** (Desktop only, optional)
 
-Don’t reboot for sport. Finish the steps below, then reboot once like an adult.
+Don’t reboot yet. Finish the steps below, then reboot.
 
 ### EEPROM — free maintenance people skip
 
@@ -238,9 +238,9 @@ DIY unit template: [`systemd/lora_pkt_fwd.service`](systemd/lora_pkt_fwd.service
 ## 5. ChirpStack — an LNS you actually *own*
 
 Stack is pre-wired for **AS923 (Thailand)**.  
-Other regions: edit MQTT topic templates in `chirpstack-docker/docker-compose.yml` and the region files. Nobody’s shipping you a personal fork for free.
+Other regions: edit MQTT topic templates in `chirpstack-docker/docker-compose.yml` and the region files.
 
-### What is ChirpStack (short version, no pitch deck)
+### What is ChirpStack (short version)
 
 [ChirpStack](https://www.chirpstack.io) is an open-source LoRaWAN Network Server: web UI for gateways/devices/tenants/integrations, plus a gRPC API.  
 No token to cheer for. No hourly “did the economics change” spiral. Bliss.
@@ -259,7 +259,7 @@ http://<m1-ip>:8080
 ```
 
 Default login: **admin / admin**  
-Leave that on a public network and you’re not “getting hacked” — you’re holding the door open with a welcome mat.
+Leave that on a public network and you’re not “getting hacked” you’re holding the door open with a welcome mat.
 
 ### Register the gateway
 
@@ -401,9 +401,9 @@ Same suite locally:
 ## Closing rant
 
 You might have bought the box because a chart was green.  
-You might be left with hardware and a TED Talk’s worth of seed-phrase trauma.
+You might be left with hardware and a TED Talk’s worth of seed phrase trauma.
 
-At least after this, the box works again —  
+At least after this, Your Sensecap m1 works again —  
 real LoRaWAN packets, your network, your rules —  
 not a dusty shrine to “yeah, I mined for a bit too.”
 
