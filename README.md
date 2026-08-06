@@ -1,93 +1,94 @@
 # SenseCAP M1 → ChirpStack
 
-> **กล่องขุด HNT ที่เคยฝันว่าจะรวย… ตอนนี้กลายเป็น RPi4 + วิทยุ LoRa ที่ยังใช้ได้อยู่**  
-> ถ้า seed ยังอยู่ ไปขุดต่อได้เลยครับ รีโปนี้ไม่ใช่สำหรับคุณ  
-> ถ้า seed หาย — ยินดีต้อนรับสู่สโมสร “ฮาร์ดแวร์แพง อารมณ์พัง ยัง salvage ได้”
+> **That HNT mining box you bought in the boom years?**  
+> Under the plastic it’s still a Raspberry Pi 4 + a perfectly good LoRa concentrator.  
+> If your seed is safe, go mine (or don’t). This repo isn’t for you.  
+> If the seed is gone — welcome to the “expensive brick, salvageable radio” club.
 
-เอา **Seeed SenseCAP M1** (Raspberry Pi 4 + WM1302/WM1303) มาเปิดเป็นเกตเวย์ + [ChirpStack](https://www.chirpstack.io) LNS ส่วนตัว  
-ไม่ต้องอ้อน blockchain ไม่ต้องเช็คราคา token ก่อนนอน
+Turn a **Seeed SenseCAP M1** (RPi 4 + WM1302/WM1303) into a private [ChirpStack](https://www.chirpstack.io) LoRaWAN gateway + network server.  
+No token charts. No epoch anxiety. Just packets you actually own.
 
-| Branch | สำหรับใคร |
-|--------|-----------|
-| **`main`** (อันนี้) | **Raspberry Pi OS Debian 13 Trixie** — ของใหม่ ใช้ตัวนี้ |
-| [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) | ยังติด Bookworm (Debian 12) อยู่ — เราไม่ทิ้งคุณ แต่ก็ไม่อัพเกรดให้ฟรีด้วย |
+| Branch | Who it’s for |
+|--------|----------------|
+| **`main`** (you are here) | **Raspberry Pi OS on Debian 13 Trixie** — use this |
+| [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) | Still on Bookworm (Debian 12) — we didn’t ghost you, we just stopped living there |
 
-**ฮาร์ดแวร์ในกล่อง:** RPi4 + Semtech SX1302 (WM1302) หรือ SX1303 (WM1303) ต่อ SPI  
-ใช่ครับ ข้างในคือ Raspberry Pi ที่ห่อพลาสติกแพงๆ มา — ข่าวดีคือมัน *ยังเป็นคอมพิวเตอร์*
+**What’s in the tin:** RPi 4 + Semtech SX1302 (WM1302) or SX1303 (WM1303) on SPI.  
+Yes, you paid “gateway money” for a Pi in a nicer shell. The upside: **it still boots Linux.**
 
 ---
 
-## เสีย seed Helium แล้วใช่ไหม
+## You lost the Helium seed phrase
 
-**กู้ไม่ได้**  
-ไม่ใช่ “ลองติดต่อซัพพอร์ต” ไม่ใช่ “อาจมี backdoor” ไม่ใช่ “เดี๋ยวทีมงานช่วย”  
-คือ **จบ** — แอปบอกชัด กล่องการ์ดก็ให้มาเขียน ถ้าเขียนแล้วเอากล่องไปรองแก้ว… นั่นคุณเอง
+**There is no recovery.**  
+Not “open a ticket.” Not “maybe support has a backdoor.” Not “my cousin knows a guy.”  
+The app was loud about this. They even shipped a card so you’d write the words down.  
+If that card is now a coaster — that’s on you.
 
-อ่านกล่องเหลืองของทางการก่อนจะมาด่าจักรวาล:  
+Official yellow warning box (read it, then stop bargaining with the universe):  
 https://docs.helium.com/wallets/wallet-seed-phrase
 
-ข่าวดี (แบบประชด):  
-ตัวเกตเวย์ยังมี SPI, ยังมี concentrator, ยังบูต Linux ได้  
-HNT อาจจากไปแล้ว แต่ **LoRaWAN ยังอยู่** — และคราวนี้คุณเป็นเจ้าของ LNS เอง ไม่ใช่แค่ “node ในเครือข่ายที่ใครก็ไม่รู้”
+Silver lining (the snarky kind):  
+SPI still works. The concentrator still works. Linux still works.  
+HNT might have left the chat, but **LoRaWAN didn’t** — and this time *you* run the LNS.
 
-### ของที่ต้องมีก่อนเริ่มบ่น
+### What you need before the complaining starts
 
-1. SenseCAP M1 ที่ seed หาย / เลิกขุดแล้ว / อยากใช้จริงจัง  
-2. พอใช้ Linux CLI ได้ (copy-paste เป็นก็รอด)  
-3. เครื่องอ่าน microSD  
-4. SD คุณภาพดี — ซื้อถูกสุดในตลาดนัดแล้วมาโวยว่า filesystem corrupt อย่านะ  
-5. เวลา + กาแฟ + การยอมรับความจริง
+1. A SenseCAP M1 (lost keys / retired miner / “I want a real gateway”)  
+2. Basic Linux CLI (copy-paste counts)  
+3. A microSD reader  
+4. A decent SD card — buy the cheapest flea-market special and cry about corruption later if you insist  
+5. Time, coffee, and a mild acceptance of consequences  
 
 ---
 
-## 1. แฟลช OS — ยุค Trixie แล้ว อย่าเอาภาพเก่าจากหีบ
+## 1. Flash the OS — it’s Trixie now; stop hoarding 2023 images
 
-โหลด [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+Grab [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 
-1. บอร์ด: **Raspberry Pi 4**  
-2. OS: **Raspberry Pi OS (64-bit)** — คำอธิบายต้องมีคำว่า **Debian Trixie**  
-   - Lite ก็ได้ (headless สายลุย)  
-   - Desktop ก็ได้ (สายอยากมีปุ่มกด)  
-3. ตั้งค่าใน Imager:  
+1. Board: **Raspberry Pi 4**  
+2. OS: **Raspberry Pi OS (64-bit)** — the description should say **Debian Trixie**  
+   - Lite = headless, fewer distractions  
+   - Desktop = buttons and a mouse, if that’s your love language  
+3. In OS customisation:  
    - username / password  
-   - Wi-Fi (ถ้าจะไร้สาย)  
-   - **เปิด SSH** — ลืมอันนี้ = นั่งมองกล่องเงียบๆ  
-4. เขียนเสร็จ → ยัด SD เข้า SenseCAP → เปิดเครื่อง
+   - Wi-Fi if needed  
+   - **Enable SSH** — forget this and you’ll be staring at a silent brick  
+4. Write → SD into the M1 → power on  
 
-SSH เข้าไปด้วยตัวโปรด: Termius, PuTTY, OpenSSH, หรืออะไรก็ได้ที่ไม่ใช่ “เดี๋ยวใช้จอ” แล้วไม่มีจอ
+SSH in with whatever you like: Termius, PuTTY, OpenSSH, muscle memory.
 
-> ยัง Bookworm อยู่? อย่าฝืนทำตาม `main` แล้วมาเปิด issue ว่า GPIO พัง  
-> ใช้ branch [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm)
+> Still on Bookworm? Don’t follow `main` and open an issue titled “GPIO broken.”  
+> Use branch [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm).
 
 ---
 
-## 2. เปิดอินเทอร์เฟซ + อย่าให้เครื่องอึดอัด
+## 2. Interfaces, firmware, and not strangling the Pi
 
-### raspi-config — เปิดของที่วิทยุต้องการ
+### raspi-config — flip the switches the radio cares about
 
 ```bash
 sudo raspi-config
 ```
 
-เข้า **Interface Options** แล้วเปิด:
+Under **Interface Options**, enable:
 
-- **SPI** ← ปิดอันนี้ = วิทยุกลายเป็นอิฐราคาแพง  
+- **SPI** ← off = expensive paperweight with antennas  
 - **I2C**  
-- **Serial Port** (login shell: No / serial hardware: Yes ถ้ามีให้เลือก)  
-- **VNC** (ถ้าลง Desktop แล้วอยากยื่นเมาส์จากระยะไกล)
+- **Serial Port** (login shell: No / hardware serial: Yes, if asked)  
+- **VNC** (Desktop only, optional)
 
-ยังไม่รีบูต ถ้ายังมีงานค้างด้านล่าง — รีบูตทีเดียวจบ อย่ารีบูตเป็นงานอดิเรก
+Don’t reboot for sport. Finish the steps below, then reboot once like an adult.
 
-### EEPROM — ของฟรีที่คนขี้เกียจข้าม
+### EEPROM — free maintenance people skip
 
 ```bash
 sudo rpi-eeprom-update -a
 ```
 
-### Swap ยุค Trixie: บอกลา `dphys-swapfile`
+### Swap on Trixie: `dphys-swapfile` left the building
 
-Trixie โยนของเก่าทิ้ง ใช้ **`rpi-swap`** แทน  
-ค่า default ส่วนใหญ่พอใช้ ถ้าจะรัน Docker เพียบแล้วอยากได้ swap ไฟล์ **2 GiB**:
+Trixie uses **`rpi-swap`**. Defaults are fine for many boxes. Want a hard **2 GiB swap file** for Docker-heavy days:
 
 ```bash
 sudo mkdir -p /etc/rpi/swap.conf.d
@@ -100,20 +101,20 @@ FixedSizeMiB=2048
 EOF
 ```
 
-มีผลหลังรีบูต (รายละเอียด: `man swap.conf`)  
-ใช่ครับ โลกหมุนไปแล้ว — config path เดิมใช้ไม่ได้ โทษ Debian ไม่ใช่โทษเรา
+Applies after reboot (`man swap.conf`).  
+Yes, the old path is dead. Blame the distro timeline, not this README.
 
-### แพ็กเกจพื้นฐาน
+### Base packages
 
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y gpiod git curl ca-certificates
 ```
 
-`gpiod` = เครื่องมือยุคใหม่หลัง sysfs GPIO ถูกฆ่าทิ้ง  
-บน Trixie เป็น **libgpiod 2.x** — syntax เปลี่ยน สคริปต์ในรีโปนี้เผื่อทั้ง 1.x และ 2.x ให้แล้ว อย่าไปก็อป `gpioset` จากบล็อกปี 2019
+`gpiod` is what you use after sysfs GPIO got cancelled.  
+Trixie ships **libgpiod 2.x** — CLI syntax changed. This repo’s reset script speaks both 1.x and 2.x. Stop pasting `gpioset` snippets from 2019 Stack Overflow.
 
-### Docker — เพราะคุณไม่ได้เกิดมาเพื่อ compile ทุกอย่างด้วยมือ
+### Docker — because you didn’t buy this box to compile the universe by hand
 
 ```bash
 curl -sSL https://get.docker.com | sh
@@ -122,16 +123,16 @@ sudo usermod -aG gpio,spi,dialout "$USER"
 sudo reboot
 ```
 
-หลังตื่น:
+After it comes back:
 
 ```bash
 sudo apt autoremove -y
-docker version   # ถ้ายังต้อง sudo = ยังไม่ได้ login ใหม่ โทษคุณ
+docker version   # still need sudo? you didn’t re-login. that’s a you problem
 ```
 
 ---
 
-## 3. ดึงรีโปนี้ลงเครื่อง
+## 3. Clone the repo
 
 ```bash
 cd ~
@@ -139,8 +140,7 @@ git clone https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
 cd SenseCAPM1-Chirpstack
 ```
 
-`main` = Trixie  
-Bookworm:
+`main` = Trixie. Bookworm:
 
 ```bash
 git clone -b bookworm https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
@@ -148,24 +148,24 @@ git clone -b bookworm https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
 
 ---
 
-## 4. Packet forwarder — หัวใจวิทยุ อย่าทำพลาดตรงนี้
+## 4. Packet forwarder — the radio’s heartbeat; don’t half-ass this
 
-GPIO แบบ `/sys/class/gpio` ตายไปแล้ว  
-`reset_lgw.sh` ในนี้ใช้ **libgpiod** และเดาเวอร์ชันเอง:
+`/sys/class/gpio` is gone.  
+`reset_lgw.sh` here uses **libgpiod** and auto-detects:
 
 - **v2** → Trixie  
 - **v1** → Bookworm  
 
-### ใส่สิทธิ์ execute
+### Executable bits
 
 ```bash
 cd ~/SenseCAPM1-Chirpstack/packet_forwarder
 chmod +x reset_lgw.sh lora_pkt_fwd spectral_scan
 ```
 
-### อ่าน Concentrator EUI (ตัวตนจริงของชิป อย่ามโน)
+### Read the concentrator EUI (the chip’s real ID — don’t invent one)
 
-WM1302 (SX1302) — คอนฟิก AS923 ไทยในรีโป:
+WM1302 (SX1302), AS923 Thailand config in-repo:
 
 ```bash
 ./lora_pkt_fwd -c global_conf_as923_th.json
@@ -177,35 +177,35 @@ WM1303 (SX1303):
 ./lora_pkt_fwd -c global_conf_as923_th_sx1303.json
 ```
 
-มองหาประมาณนี้ แล้ว**จด** — อย่าแค่มองแล้วพยัก:
+Look for something like this, **write it down**, then stop romanticizing the log:
 
 ```text
 INFO: concentrator EUI: 0xXXXXXXXXYYYYYYYY
 ```
 
-`Ctrl+C` หยุดได้
+`Ctrl+C` when you’re done staring.
 
-### ยัด EUI ลง config
+### Put the EUI in the config
 
 ```bash
-nano global_conf_as923_th.json   # หรือไฟล์ sx1303
+nano global_conf_as923_th.json   # or the sx1303 file
 ```
 
-หา `gateway_ID` ใต้ `gateway_conf`  
-ใส่ EUI **ตัด `0x` ออก** เหลือ 16 ตัว hex:
+Find `gateway_ID` under `gateway_conf`.  
+Paste the EUI **without** the `0x` — 16 hex chars:
 
 ```json
 "gateway_ID": "XXXXXXXXYYYYYYYY",
 ```
 
-เซฟ ออก  
-ใส่เลขผิด = ChirpStack มองไม่เห็นเกตเวย์ แล้วคุณจะมาด่า “ขึ้นไม่ติด” ทั้งที่พิมพ์เลขเองผิด
+Save. Exit.  
+Wrong ID = ChirpStack ghosts your gateway while you swear the software is broken.
 
-> ไบนารี `lora_pkt_fwd` มาเป็น aarch64 สำหรับ RPi4  
-> ตัว build บน Bookworm ปกติวิ่งบน Trixie ได้ (glibc ใหม่กว่า)  
-> ถ้า loader โวยเรื่อง glibc — ไป build เองจาก [sx1302_hal](https://github.com/Lora-net/sx1302_hal) บนเครื่องจริง อย่าแท็ก issue ว่า “binary หลอน” ก่อนลอง
+> Prebuilt `lora_pkt_fwd` is aarch64 for RPi 4.  
+> Bookworm-built binaries usually run on Trixie (newer glibc).  
+> Loader/glibc errors? Rebuild from [sx1302_hal](https://github.com/Lora-net/sx1302_hal) on the Pi before filing “binary haunted” issues.
 
-### ลงเป็น systemd (แนะนำ — รีบูตแล้วต้องลุกเอง)
+### systemd (recommended — reboots shouldn’t need a ritual)
 
 ```bash
 cd ~/SenseCAPM1-Chirpstack
@@ -218,57 +218,56 @@ WM1303:
 sudo ./scripts/install-lora-service.sh --config global_conf_as923_th_sx1303.json
 ```
 
-user คนละชื่อ:
+Custom user:
 
 ```bash
 sudo ./scripts/install-lora-service.sh --user youruser --config global_conf_as923_th.json
 ```
 
-เช็คว่ายังหายใจ:
+Is it alive:
 
 ```bash
 sudo systemctl status lora_pkt_fwd.service
 journalctl -u lora_pkt_fwd -f
 ```
 
-อยากลงมือเอง: ดู template ที่ [`systemd/lora_pkt_fwd.service`](systemd/lora_pkt_fwd.service)
+DIY unit template: [`systemd/lora_pkt_fwd.service`](systemd/lora_pkt_fwd.service).
 
 ---
 
-## 5. ChirpStack — LNS ที่คุณ *เป็นเจ้าของ* จริงๆ
+## 5. ChirpStack — an LNS you actually *own*
 
-สแต็กนี้เซ็ต **AS923 (ไทย)** ไว้ให้แล้ว  
-โซนอื่น: ไปแก้ topic ใน `chirpstack-docker/docker-compose.yml` กับไฟล์ region เอง อย่ารอให้ใครมา fork ให้ฟรี
+Stack is pre-wired for **AS923 (Thailand)**.  
+Other regions: edit MQTT topic templates in `chirpstack-docker/docker-compose.yml` and the region files. Nobody’s shipping you a personal fork for free.
 
-### ChirpStack คืออะไร (เวอร์ชันสั้น ไม่มีสไลด์ขายของ)
+### What is ChirpStack (short version, no pitch deck)
 
-[ChirpStack](https://www.chirpstack.io) = LoRaWAN Network Server โอเพนซอร์ส  
-มีเว็บ จัดการเกตเวย์/อุปกรณ์/tenant/integration + gRPC API  
-ไม่มี token ให้เชียร์ ไม่มี “epoch” ให้รีเฟรชทุกชั่วโมง — สงบดี
+[ChirpStack](https://www.chirpstack.io) is an open-source LoRaWAN Network Server: web UI for gateways/devices/tenants/integrations, plus a gRPC API.  
+No token to cheer for. No hourly “did the economics change” spiral. Bliss.
 
-### สตาร์ท
+### Start it
 
 ```bash
 cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
 docker compose up -d
 ```
 
-รอ 1–3 นาที (postgres กับเพื่อนๆ กำลังจัดแถว) แล้วเปิด:
+Wait 1–3 minutes (Postgres and friends are finding their chairs), then:
 
 ```text
-http://<ip-ของ-m1>:8080
+http://<m1-ip>:8080
 ```
 
-ล็อกอินเริ่มต้น: **admin / admin**  
-ถ้าเปิดทิ้งไว้บนเน็ตสาธารณะด้วยรหัสนี้ — นั่นไม่ใช่ “แฮ็ก” นั่นคือ “เชิญเข้าบ้านแล้ววางกุญแจไว้หน้าประตู”
+Default login: **admin / admin**  
+Leave that on a public network and you’re not “getting hacked” — you’re holding the door open with a welcome mat.
 
-### ลงทะเบียนเกตเวย์
+### Register the gateway
 
-1. เมนูซ้าย → **Gateways** → เพิ่ม  
-2. **Gateway ID** = EUI เดียวกับใน packet forwarder  
-   (คนละเลข = นั่งมองกราฟว่างเปล่า)
+1. Left menu → **Gateways** → add  
+2. **Gateway ID** = same EUI as the packet forwarder  
+   (Mismatch = empty charts and a long evening of self-inflicted debugging)
 
-### (ทางเลือก) ดึง device profile จาก lorawan-devices
+### (Optional) Import lorawan-devices profiles
 
 ```bash
 cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
@@ -276,35 +275,33 @@ sudo apt install -y make
 make import-lorawan-devices
 ```
 
-เอกสารยาวๆ ไปที่: https://www.chirpstack.io/docs/
+Docs for people who like reading: https://www.chirpstack.io/docs/
 
 ---
 
-## 6. Node-RED (ถ้าอยากลากเส้นมากกว่าเขียนโค้ด)
+## 6. Node-RED (optional — drag wires, feel productive)
 
 ```bash
 cd ~
 bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
 ```
 
-ตอบตามใจ (Pi nodes ก็ได้) แล้ว:
+Answer the prompts (Pi nodes if you want), then:
 
 ```bash
 sudo systemctl enable --now nodered.service
 ```
 
-เปิด: `http://<ip>:1880`  
-เอาไว้ต่อ MQTT / แจ้งเตือน / dashboard — จะทำ “smart farm” หรือแค่โชว์เพื่อนว่า “ยังใช้กล่องนี้ได้อยู่” ก็เรื่องของคุณ
+UI: `http://<ip>:1880`  
+MQTT bridges, dashboards, “look it still does something” demos — your call.
 
 ---
 
-## 7. สายโหด: ยิงแพ็กเก็ตไปหลาย LNS พร้อมกัน
+## 7. Advanced: shoot packets at multiple LNS at once
 
-[ChirpStack Packet Multiplexer](https://github.com/chirpstack/chirpstack-packet-multiplexer)  
-ตัวกลางรับ UDP จาก packet forwarder แล้วกระจายไปหลายเซิร์ฟเวอร์  
-เช่น ChirpStack บ้านตัวเอง + TTN — แบบไม่ต้องมีเกตเวย์สองเครื่อง
+[ChirpStack Packet Multiplexer](https://github.com/chirpstack/chirpstack-packet-multiplexer) sits in front of Semtech UDP and fans out to several backends — private ChirpStack + TTN, etc. One radio, several networks. Fancy.
 
-### ติดตั้ง (repo 4.x — เลิกใช้ `apt-key` ซะที มัน deprecate มานานแล้ว)
+### Install (4.x apt repo — `apt-key` is a fossil, stop using it)
 
 ```bash
 sudo apt install -y gpg wget apt-transport-https
@@ -315,9 +312,9 @@ sudo apt update
 sudo apt install -y chirpstack-packet-multiplexer
 ```
 
-### คอนฟิก
+### Configure
 
-เทมเพลต v4 อยู่ในรีโป:
+v4 template ships in this repo:
 
 ```bash
 sudo mkdir -p /etc/chirpstack-packet-multiplexer
@@ -326,8 +323,8 @@ sudo cp ~/SenseCAPM1-Chirpstack/chirpstack-packet-multiplexer.toml \
 sudo nano /etc/chirpstack-packet-multiplexer/chirpstack-packet-multiplexer.toml
 ```
 
-ค่าเริ่มต้น bind **`:17000`** — ไม่ชน Gateway Bridge ที่ **`:1700`**  
-ใช้ mux แล้วให้ packet forwarder ชี้ `serv_port_up` / `serv_port_down` ไป **17000**
+Default bind is **`:17000`** so it doesn’t fistfight Gateway Bridge on **`:1700`**.  
+Using the mux? Point packet-forwarder `serv_port_up` / `serv_port_down` at **17000**.
 
 ```bash
 sudo systemctl enable --now chirpstack-packet-multiplexer
@@ -336,64 +333,64 @@ sudo systemctl status chirpstack-packet-multiplexer
 
 ---
 
-## 8. โบนัส: Mysterium — ถ้ายังอยากให้กล่อง “หาเงิน” แบบอื่น
+## 8. Bonus: Mysterium — if the box still wants a side hustle
 
 ```bash
 sudo -E bash -c "$(curl -s https://raw.githubusercontent.com/mysteriumnetwork/node/master/install.sh)"
 sudo reboot
 ```
 
-รอ 5–10 นาที แล้วลอง: `http://<ip>:4449`  
-ไม่การันตีรวย แค่บอกว่ากล่องยังมีประโยชน์หลายหน้า — ไม่ต้องเป็นอนุสรณ์ HNT อย่างเดียว
+After 5–10 minutes: `http://<ip>:4449`  
+Not a get-rich scheme. Just proof the hardware can wear more than one hat — it doesn’t have to be an HNT memorial forever.
 
 ---
 
 ## Desktop / VNC
 
-ลง Desktop มา? ใช้ VNC หรือ Raspberry Pi Connect ก็ได้  
-สาย Lite ไม่ต้องอ่านหัวข้อนี้ ไปนั่ง SSH ต่อ
+Installed Desktop? Use a VNC client or Raspberry Pi Connect.  
+Lite users: skip this heading, go back to SSH, you’re fine.
 
 ---
 
-## ย้ายจาก Bookworm → Trixie (สรุปแบบไม่อวย)
+## Bookworm → Trixie (no marketing, just scars)
 
-| เรื่อง | Bookworm | Trixie (`main`) |
-|--------|----------|-----------------|
-| ฐาน | Debian 12 | Debian 13 |
+| Topic | Bookworm | Trixie (`main`) |
+|-------|----------|-----------------|
+| Base | Debian 12 | Debian 13 |
 | Swap | `dphys-swapfile` | `rpi-swap` |
 | GPIO CLI | libgpiod **1.x** | libgpiod **2.x** |
-| `reset_lgw.sh` | โบราณกว่า | เดา v1/v2 เอง |
-| Multiplexer apt | 3.x + `apt-key` ซาก | **4.x** + keyring |
-| Compose | ยังมีคนใส่ `version:` | ไม่ต้องแล้ว |
-| รูป Docker | postgres 14 / `latest` ลอยๆ | postgres **16** / ChirpStack **4** |
+| `reset_lgw.sh` | older | auto v1/v2 |
+| Multiplexer apt | 3.x + dead `apt-key` | **4.x** + keyring |
+| Compose | people still paste `version:` | not required |
+| Images | postgres 14 / floaty `latest` | postgres **16** / ChirpStack **4** |
 
-สรุป: ของเก่าพังไม่ใช่เพราะ “คุณโชคร้าย” — เพราะโลกอัปเดต แล้วรีโปนี้ตามทันบน `main`
+If old recipes break, it’s not cosmic punishment — the platform moved. `main` moved with it.
 
 ---
 
-## โครงรีโป (สำหรับคนขี้เกียจคลิกทีละโฟลเดอร์)
+## Repo layout (for people who hate clicking)
 
 ```text
 SenseCAPM1-Chirpstack/
-├── packet_forwarder/     # วิทยุ + conf + reset
-├── chirpstack-docker/    # LNS ทั้งก้อนใน Compose
-├── scripts/              # ลง service + ตรวจ syntax
-├── systemd/              # unit ตัวอย่าง
-├── .github/workflows/    # CI กัน script พังเงียบๆ
+├── packet_forwarder/     # radio + conf + reset
+├── chirpstack-docker/    # full LNS stack
+├── scripts/              # service install + syntax checks
+├── systemd/              # unit template
+├── .github/workflows/    # CI so scripts don’t silently rot
 └── chirpstack-packet-multiplexer.toml
 ```
 
-## CI — กัน “กูแก้ script แล้วลืม semicolon”
+## CI — because “I only changed one line” is a famous last sentence
 
-Push/PR ไป `main` / `bookworm` แล้ว Actions จะรัน:
+On push/PR to `main` / `bookworm`, Actions runs:
 
 - `bash -n` / `sh -n`
 - ShellCheck
 - `py_compile`
 - `docker compose config`
-- เช็คโครง systemd คร่าวๆ
+- basic systemd unit shape check
 
-รันเองบนเครื่อง:
+Same suite locally:
 
 ```bash
 ./scripts/check-syntax.sh
@@ -401,13 +398,14 @@ Push/PR ไป `main` / `bookworm` แล้ว Actions จะรัน:
 
 ---
 
-## ท้ายเรื่อง
+## Closing rant
 
-เคยซื้อกล่องมาเพราะกราฟเขียว  
-ตอนนี้อาจเหลือแค่กล่องกับบทเรียนเรื่อง seed phrase  
+You might have bought the box because a chart was green.  
+You might be left with hardware and a TED Talk’s worth of seed-phrase trauma.
 
-อย่างน้อยหลังทำตามนี้ กล่องจะได้ทำงานอีกครั้ง —  
-ส่งแพ็กเก็ต LoRaWAN จริง ไม่ใช่แค่นั่งเป็นอนุสาวรีย์ “ช่วงนั้นฉันก็ขุดเหมือนกัน”
+At least after this, the box works again —  
+real LoRaWAN packets, your network, your rules —  
+not a dusty shrine to “yeah, I mined for a bit too.”
 
 **Made in Phatthalung, Thailand.**  
-ยังกวนได้ ยัง salvage ได้ ยังไม่ทิ้งฮาร์ดแวร์ดีๆ แค่เพราะ token ไม่เล่นด้วย
+Still snarky. Still salvageable. Still too good a radio to landfill over a missing 12 words.
