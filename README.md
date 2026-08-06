@@ -1,71 +1,62 @@
-# SenseCAP M1 ChirpStack
+# SenseCAP M1 → ChirpStack
 
-> **That HNT mining box you bought in the boom years?**  
-> Under the metal case it’s still a Raspberry Pi 4 + a perfectly good LoRa concentrator.  
-> If your seed is safe, go mine (or don’t). This repo isn’t for you.  
-> If the seed is gone. welcome to the “expensive brick, salvageable radio” club.
+Repurpose a **Seeed SenseCAP M1** (Raspberry Pi 4 + WM1302/WM1303 LoRa concentrator) as a private [ChirpStack](https://www.chirpstack.io) LoRaWAN gateway and network server.
 
-Turn a **Seeed SenseCAP M1** (RPi 4 + WM1302/WM1303) into a private [ChirpStack](https://www.chirpstack.io) LoRaWAN gateway + network server.  
-No token charts. No epoch anxiety. Just packets you actually own.
+Built for people who still have the hardware, but not the Helium wallet keys — and would rather run real LoRaWAN than leave a good radio in a drawer.
 
-| Branch | Who it’s for |
-|--------|----------------|
-| **`main`** (you are here) | **Raspberry Pi OS on Debian 13 Trixie** — use this |
-| [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) | Still on Bookworm (Debian 12) — we didn’t ghost you, we just stopped living there |
+| Branch | Target OS |
+|--------|-----------|
+| **`main`** (this branch) | **Raspberry Pi OS on Debian 13 Trixie** (recommended) |
+| [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) | Raspberry Pi OS Bookworm (Debian 12) — legacy |
 
-**What’s in the enclosure:** RPi 4 + Semtech SX1302 (WM1302) or SX1303 (WM1303) on SPI.  
-Yes, you paid “gateway money” for a Pi in a nicer shell. The upside: **it still boots Linux.**
+**Hardware:** SenseCAP M1 = RPi 4 + Semtech SX1302 (WM1302) or SX1303 (WM1303) over SPI.
+
+**Current release:** **v2.0.0** — Trixie support, ChirpStack 4, CI, install helpers. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## You lost the Helium seed phrase
+## Lost Helium seed phrase?
 
 **There is no recovery.**  
-Not “open a ticket.” Not “maybe support has a backdoor.” Not “my cousin knows a guy.”  
-The app was loud about this. They even shipped a card so you’d write the words down.  
-If that card is now a coaster. that’s on you.
+The Helium app is explicit about this during setup, which is why it ships with a write-down card. If those words are gone, the wallet is gone.
 
-Official yellow warning box (read it, then stop bargaining with the universe):  
-https://docs.helium.com/wallets/wallet-seed-phrase
+Official warning: https://docs.helium.com/wallets/wallet-seed-phrase
 
-Silver lining (the snarky kind):  
-SPI still works. The concentrator still works. Linux still works.  
-HNT might have left the chat, but **LoRaWAN didn’t** and this time *you* run the LNS.
+The good news: the gateway hardware is still useful. SPI, the concentrator, and Linux all still work. HNT may be out of reach, but **LoRaWAN is not** — and with ChirpStack, you run the network server yourself.
 
-### What you need before the complaining starts
+### Requirements
 
-1. A SenseCAP M1 (lost keys / retired miner / “I want a real gateway”)  
-2. Basic Linux CLI (copy-paste counts)  
-3. A microSD reader  
-4. A decent SD card - buy the cheapest flea-market special and cry about corruption later if you insist  
-5. Your time, beers and a mild acceptance of consequences  
+1. SenseCAP M1 (lost keys, retired miner, or intentional repurpose)
+2. Basic Linux command line
+3. Micro SD card reader
+4. Decent quality SD card (A2 / high endurance recommended)
+5. A bit of time
 
 ---
 
-## 1. Flash the OS - it’s Trixie now; stop hoarding 2023 images
+## 1. Flash Raspberry Pi OS (Trixie)
 
-Grab [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
+Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 
-1. Board: **Raspberry Pi 4**  
-2. OS: **Raspberry Pi OS (64-bit)** — the description should say **Debian Trixie**  
-   - Lite = headless, fewer distractions  
-   - Desktop = buttons and a mouse, if that’s your love language  
-3. In OS customisation:  
-   - username / password  
-   - Wi-Fi if needed  
-   - **Enable SSH** — forget this and you’ll be staring at a silent brick  
-4. Write → SD into the M1 → power on  
+1. Board: **Raspberry Pi 4**
+2. OS: **Raspberry Pi OS (64-bit)** — description should mention **Debian Trixie**  
+   - Lite is enough for headless gateways  
+   - Desktop is fine if you want a GUI
+3. In OS customisation:
+   - Set username and password
+   - Configure Wi-Fi if needed
+   - **Enable SSH**
+4. Write the image, insert the SD into the M1, power on
 
-SSH in with whatever you like: Termius, PuTTY, OpenSSH, muscle memory.
+SSH in with Termius, PuTTY bla bla.
 
-> Still on Bookworm? Don’t follow `main` and open an issue titled “GPIO broken.”  
-> Use branch [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm).
+> Still on Bookworm? Use branch [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) instead of following `main`.
 
 ---
 
-## 2. Interfaces, firmware, and not strangling the Pi
+## 2. Board setup
 
-### raspi-config — flip the switches the radio cares about
+### Enable interfaces
 
 ```bash
 sudo raspi-config
@@ -73,22 +64,22 @@ sudo raspi-config
 
 Under **Interface Options**, enable:
 
-- **SPI** ← off = expensive paperweight with antennas  
-- **I2C**  
-- **Serial Port** (login shell: No / hardware serial: Yes, if asked)  
-- **VNC** (Desktop only, optional)
+- **SPI** (required for WM1302/WM1303)
+- **I2C**
+- **Serial Port** (login shell: No / hardware serial: Yes, if asked)
+- **VNC** (optional, Desktop only)
 
-Don’t reboot yet. Finish the steps below, then reboot.
+Finish the steps below before rebooting.
 
-### EEPROM — free maintenance people skip
+### Update EEPROM (recommended)
 
 ```bash
 sudo rpi-eeprom-update -a
 ```
 
-### Swap on Trixie: `dphys-swapfile` left the building
+### Swap on Trixie (`rpi-swap`)
 
-Trixie uses **`rpi-swap`**. Defaults are fine for many boxes. Want a hard **2 GiB swap file** for Docker-heavy days:
+Trixie uses **`rpi-swap`** instead of `dphys-swapfile`. Defaults are fine for many installs. For a fixed **2 GiB** swap file (helpful with Docker):
 
 ```bash
 sudo mkdir -p /etc/rpi/swap.conf.d
@@ -101,8 +92,7 @@ FixedSizeMiB=2048
 EOF
 ```
 
-Applies after reboot (`man swap.conf`).  
-Yes, the old path is dead. Blame the distro timeline, not this README.
+Applies after reboot (`man swap.conf`).
 
 ### Base packages
 
@@ -111,10 +101,9 @@ sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y gpiod git curl ca-certificates
 ```
 
-`gpiod` is what you use after sysfs GPIO got cancelled.  
-Trixie ships **libgpiod 2.x** — CLI syntax changed. This repo’s reset script speaks both 1.x and 2.x. Stop pasting `gpioset` snippets from 2019 Stack Overflow.
+`gpiod` provides the modern GPIO tools. Trixie ships **libgpiod 2.x** (different CLI from Bookworm’s 1.x). This repo’s reset script supports both.
 
-### Docker — because you didn’t buy this box to compile the universe by hand
+### Docker
 
 ```bash
 curl -sSL https://get.docker.com | sh
@@ -123,16 +112,16 @@ sudo usermod -aG gpio,spi,dialout "$USER"
 sudo reboot
 ```
 
-After it comes back:
+After reboot:
 
 ```bash
 sudo apt autoremove -y
-docker version   # still need sudo? you didn’t re-login. that’s a you problem
+docker version   # should work without sudo after re-login
 ```
 
 ---
 
-## 3. Clone the repo
+## 3. Clone this repo
 
 ```bash
 cd ~
@@ -140,7 +129,7 @@ git clone https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
 cd SenseCAPM1-Chirpstack
 ```
 
-`main` = Trixie. Bookworm:
+`main` = Trixie. For Bookworm:
 
 ```bash
 git clone -b bookworm https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
@@ -148,24 +137,24 @@ git clone -b bookworm https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
 
 ---
 
-## 4. Packet forwarder — the radio’s heartbeat; don’t half-ass this
+## 4. Packet forwarder (WM1302 / WM1303)
 
-`/sys/class/gpio` is gone.  
-`reset_lgw.sh` here uses **libgpiod** and auto-detects:
+Sysfs GPIO is gone on modern Raspberry Pi OS.  
+`reset_lgw.sh` uses **libgpiod** and auto-detects:
 
 - **v2** → Trixie  
 - **v1** → Bookworm  
 
-### Executable bits
+### Make binaries executable
 
 ```bash
 cd ~/SenseCAPM1-Chirpstack/packet_forwarder
 chmod +x reset_lgw.sh lora_pkt_fwd spectral_scan
 ```
 
-### Read the concentrator EUI (the chip’s real ID — don’t invent one)
+### Read concentrator EUI
 
-WM1302 (SX1302), AS923 Thailand config in-repo:
+WM1302 (SX1302), AS923 Thailand config:
 
 ```bash
 ./lora_pkt_fwd -c global_conf_as923_th.json
@@ -177,35 +166,29 @@ WM1303 (SX1303):
 ./lora_pkt_fwd -c global_conf_as923_th_sx1303.json
 ```
 
-Look for something like this, **write it down**, then stop romanticizing the log:
+Note the line:
 
 ```text
 INFO: concentrator EUI: 0xXXXXXXXXYYYYYYYY
 ```
 
-`Ctrl+C` when you’re done staring.
+Then stop with `Ctrl+C`.
 
-### Put the EUI in the config
+### Set Gateway ID
 
 ```bash
 nano global_conf_as923_th.json   # or the sx1303 file
 ```
 
-Find `gateway_ID` under `gateway_conf`.  
-Paste the EUI **without** the `0x` — 16 hex chars:
+Under `gateway_conf`, set `gateway_ID` to the EUI **without** the `0x` prefix (16 hex characters):
 
 ```json
 "gateway_ID": "XXXXXXXXYYYYYYYY",
 ```
 
-Save. Exit.  
-Wrong ID = ChirpStack ghosts your gateway while you swear the software is broken.
+> Prebuilt `lora_pkt_fwd` is aarch64 for RPi 4. Bookworm-built binaries usually run on Trixie. If you hit glibc/loader errors, rebuild from [sx1302_hal](https://github.com/Lora-net/sx1302_hal) on the Pi.
 
-> Prebuilt `lora_pkt_fwd` is aarch64 for RPi 4.  
-> Bookworm-built binaries usually run on Trixie (newer glibc).  
-> Loader/glibc errors? Rebuild from [sx1302_hal](https://github.com/Lora-net/sx1302_hal) on the Pi before filing “binary haunted” issues.
-
-### systemd (recommended — reboots shouldn’t need a ritual)
+### Install as a systemd service (recommended)
 
 ```bash
 cd ~/SenseCAPM1-Chirpstack
@@ -224,50 +207,46 @@ Custom user:
 sudo ./scripts/install-lora-service.sh --user youruser --config global_conf_as923_th.json
 ```
 
-Is it alive:
+Status / logs:
 
 ```bash
 sudo systemctl status lora_pkt_fwd.service
 journalctl -u lora_pkt_fwd -f
 ```
 
-DIY unit template: [`systemd/lora_pkt_fwd.service`](systemd/lora_pkt_fwd.service).
+Manual template: [`systemd/lora_pkt_fwd.service`](systemd/lora_pkt_fwd.service).
 
 ---
 
-## 5. ChirpStack — an LNS you actually *own*
+## 5. ChirpStack (Docker Compose)
 
-Stack is pre-wired for **AS923 (Thailand)**.  
-Other regions: edit MQTT topic templates in `chirpstack-docker/docker-compose.yml` and the region files.
+Pre-configured for **AS923 (Thailand)**. For other regions, edit MQTT topic templates in `chirpstack-docker/docker-compose.yml` and the region files under `configuration/`.
 
-### What is ChirpStack (short version)
+### What is ChirpStack?
 
-[ChirpStack](https://www.chirpstack.io) is an open-source LoRaWAN Network Server: web UI for gateways/devices/tenants/integrations, plus a gRPC API.  
-No token to cheer for. No hourly “did the economics change” spiral. Bliss.
+[ChirpStack](https://www.chirpstack.io) is an open-source LoRaWAN Network Server with a web UI for gateways, devices, tenants, and integrations, plus a gRPC API.
 
-### Start it
+### Start the stack
 
 ```bash
 cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
 docker compose up -d
 ```
 
-Wait 1–3 minutes (Postgres and friends are finding their chairs), then:
+Wait 1–3 minutes, then open:
 
 ```text
 http://<m1-ip>:8080
 ```
 
-Default login: **admin / admin**  
-Leave that on a public network and you’re not “getting hacked” you’re holding the door open with a welcome mat.
+Default login: **admin / admin** — change this if the host is reachable beyond a trusted LAN.
 
 ### Register the gateway
 
 1. Left menu → **Gateways** → add  
-2. **Gateway ID** = same EUI as the packet forwarder  
-   (Mismatch = empty charts and a long evening of self-inflicted debugging)
+2. **Gateway ID** = same EUI as in the packet-forwarder config  
 
-### (Optional) Import lorawan-devices profiles
+### (Optional) Import device profiles
 
 ```bash
 cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
@@ -275,33 +254,32 @@ sudo apt install -y make
 make import-lorawan-devices
 ```
 
-Docs for people who like reading: https://www.chirpstack.io/docs/
+Docs: https://www.chirpstack.io/docs/
 
 ---
 
-## 6. Node-RED (optional — drag wires, feel productive)
+## 6. Node-RED (optional)
 
 ```bash
 cd ~
 bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
 ```
 
-Answer the prompts (Pi nodes if you want), then:
+Answer the prompts (Pi-specific nodes if you want), then:
 
 ```bash
 sudo systemctl enable --now nodered.service
 ```
 
-UI: `http://<ip>:1880`  
-MQTT bridges, dashboards, “look it still does something” demos — your call.
+UI: `http://<ip>:1880`
 
 ---
 
-## 7. Advanced: shoot packets at multiple LNS at once
+## 7. Advanced: multiple LNS with Packet Multiplexer
 
-[ChirpStack Packet Multiplexer](https://github.com/chirpstack/chirpstack-packet-multiplexer) sits in front of Semtech UDP and fans out to several backends — private ChirpStack + TTN, etc. One radio, several networks. Fancy.
+[ChirpStack Packet Multiplexer](https://github.com/chirpstack/chirpstack-packet-multiplexer) forwards Semtech UDP traffic to several backends (e.g. private ChirpStack + TTN).
 
-### Install (4.x apt repo — `apt-key` is a fossil, stop using it)
+### Install (ChirpStack 4.x apt repo)
 
 ```bash
 sudo apt install -y gpg wget apt-transport-https
@@ -314,8 +292,6 @@ sudo apt install -y chirpstack-packet-multiplexer
 
 ### Configure
 
-v4 template ships in this repo:
-
 ```bash
 sudo mkdir -p /etc/chirpstack-packet-multiplexer
 sudo cp ~/SenseCAPM1-Chirpstack/chirpstack-packet-multiplexer.toml \
@@ -323,8 +299,8 @@ sudo cp ~/SenseCAPM1-Chirpstack/chirpstack-packet-multiplexer.toml \
 sudo nano /etc/chirpstack-packet-multiplexer/chirpstack-packet-multiplexer.toml
 ```
 
-Default bind is **`:17000`** so it doesn’t fistfight Gateway Bridge on **`:1700`**.  
-Using the mux? Point packet-forwarder `serv_port_up` / `serv_port_down` at **17000**.
+Default template binds on **`:17000`** so it does not clash with Gateway Bridge on **`:1700`**.  
+When using the multiplexer, point packet-forwarder `serv_port_up` / `serv_port_down` to **17000**.
 
 ```bash
 sudo systemctl enable --now chirpstack-packet-multiplexer
@@ -333,64 +309,64 @@ sudo systemctl status chirpstack-packet-multiplexer
 
 ---
 
-## 8. Bonus: Mysterium — if the box still wants a side hustle
+## 8. Bonus: Mysterium node
 
 ```bash
 sudo -E bash -c "$(curl -s https://raw.githubusercontent.com/mysteriumnetwork/node/master/install.sh)"
 sudo reboot
 ```
 
-After 5–10 minutes: `http://<ip>:4449`  
-Not a get-rich scheme. Just proof the hardware can wear more than one hat — it doesn’t have to be an HNT memorial forever.
+After 5–10 minutes: `http://<ip>:4449`
 
 ---
 
 ## Desktop / VNC
 
-Installed Desktop? Use a VNC client or Raspberry Pi Connect.  
-Lite users: skip this heading, go back to SSH, you’re fine.
+If you installed Desktop, use a VNC client or Raspberry Pi Connect for remote GUI access.
 
 ---
 
-## Bookworm → Trixie (no marketing, just scars)
+## Bookworm → Trixie migration notes
 
 | Topic | Bookworm | Trixie (`main`) |
 |-------|----------|-----------------|
-| Base | Debian 12 | Debian 13 |
+| Base OS | Debian 12 | Debian 13 |
 | Swap | `dphys-swapfile` | `rpi-swap` |
 | GPIO CLI | libgpiod **1.x** | libgpiod **2.x** |
-| `reset_lgw.sh` | older | auto v1/v2 |
-| Multiplexer apt | 3.x + dead `apt-key` | **4.x** + keyring |
-| Compose | people still paste `version:` | not required |
-| Images | postgres 14 / floaty `latest` | postgres **16** / ChirpStack **4** |
-
-If old recipes break, it’s not cosmic punishment — the platform moved. `main` moved with it.
+| `reset_lgw.sh` | v1-oriented | auto-detects v1 and v2 |
+| Multiplexer apt | 3.x + deprecated `apt-key` | **4.x** + `/etc/apt/keyrings` |
+| Multiplexer config | v3 TOML shape | v4 `[multiplexer]` / `[[multiplexer.server]]` |
+| Docker Compose | optional `version:` key | Compose Spec (no `version`) |
+| Images | postgres 14 / floating `latest` | postgres **16** / ChirpStack major **4** |
 
 ---
 
-## Repo layout (for people who hate clicking)
+## Repo layout
 
 ```text
 SenseCAPM1-Chirpstack/
-├── packet_forwarder/     # radio + conf + reset
-├── chirpstack-docker/    # full LNS stack
-├── scripts/              # service install + syntax checks
-├── systemd/              # unit template
-├── .github/workflows/    # CI so scripts don’t silently rot
+├── packet_forwarder/          # Semtech UDP PF + configs + reset
+├── chirpstack-docker/         # ChirpStack v4 Compose stack
+├── scripts/
+│   ├── install-lora-service.sh
+│   └── check-syntax.sh
+├── systemd/lora_pkt_fwd.service
+├── .github/workflows/ci.yml
+├── CHANGELOG.md
 └── chirpstack-packet-multiplexer.toml
 ```
 
-## CI — because “I only changed one line” is a famous last sentence
+## CI / local checks
 
-On push/PR to `main` / `bookworm`, Actions runs:
+GitHub Actions runs on push/PR to `main` and `bookworm`:
 
-- `bash -n` / `sh -n`
-- ShellCheck
-- `py_compile`
-- `docker compose config`
-- basic systemd unit shape check
+- `bash -n` / `sh -n` on shell scripts  
+- ShellCheck  
+- `python -m py_compile`  
+- `docker compose config`  
+- basic systemd unit layout check  
 
-Same suite locally:
+Run locally:
 
 ```bash
 ./scripts/check-syntax.sh
@@ -398,14 +374,9 @@ Same suite locally:
 
 ---
 
-## Closing rant
+## Closing
 
-You might have bought the box because a chart was green.  
-You might be left with hardware and a TED Talk’s worth of seed phrase trauma.
+If the miner chapter is over, the hardware chapter doesn’t have to be.  
+This guide turns the M1 back into a working LoRaWAN gateway, your network, your rules.
 
-At least after this, Your Sensecap m1 works again —  
-real LoRaWAN packets, your network, your rules —  
-not a dusty shrine to “yeah, I mined for a bit too.”
-
-**Made in Phatthalung, Thailand.**  
-Still snarky. Still salvageable. Still too good a radio to landfill over a missing 12 words.
+**Made in Phatthalung, Thailand.**
