@@ -1,252 +1,349 @@
-## You Lost your Helium Seed phrase
-**F**irst of all. I very hate to tell you but if you lost the seed phrase or Solana private key, that’s it. There is no recovery. The app is very clear about this during setup. that is why it comes with a card to write your phrase down on. Take care of your seed phrases next time.
+# SenseCAP M1 → ChirpStack (Raspberry Pi OS Trixie)
 
-Read the YELLOW WARNING BOX here: https://docs.helium.com/wallets/wallet-seed-phrase
+Turn a **Seeed SenseCAP M1** (Raspberry Pi 4 + WM1302/WM1303 LoRa concentrator) into a private [ChirpStack](https://www.chirpstack.io) LoRaWAN Network Server gateway.
 
-Requirements 
-1. Lost Key SenseCAP M1 
-2. Basic Linux Command Line 
-3. Micro SD Card Reader 
-4. Good Performance SD Card
+| Branch | Target OS |
+|--------|-----------|
+| **`main`** (this branch) | **Raspberry Pi OS based on Debian 13 Trixie** (current) |
+| [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) | Raspberry Pi OS Bookworm (Debian 12) — legacy |
+
+> **Hardware:** SenseCAP M1 = RPi 4 + Semtech SX1302 (WM1302) or SX1303 (WM1303) SPI module.
+
+---
+
+## If you lost your Helium seed phrase
+
+There is **no recovery**. The Helium app is explicit about this during setup — that is why it ships with a write-down card. See the official warning: https://docs.helium.com/wallets/wallet-seed-phrase
+
+### Requirements
+
+1. SenseCAP M1 (lost Helium keys / re-purposing as ChirpStack gateway)
+2. Basic Linux command line
+3. Micro SD card reader
+4. Good quality SD card (A2 / high endurance recommended)
 5. Time
 
+---
 
-Flash Raspberry Pi Image to Your SD Card with RPI Imager Download here
-https://www.raspberrypi.com/software/
+## 1. Flash Raspberry Pi OS (Trixie)
 
-**Install and run it** 
+Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 
-**Flash Your SD Card with Raspberry Pi Imager**
-Choose ***Raspberry Pi 4*** Board, 
-Select OS ***Raspberry Pi OS (bookworm) 64bit*** (minimal or desktop is on your call)
-Setup User Name, Password, Wifi connection and ***Enable SSH*** 
+1. Choose board: **Raspberry Pi 4**
+2. Choose OS: **Raspberry Pi OS (64-bit)** — description should say **Debian Trixie**  
+   (Lite or Desktop is fine; Lite is enough for headless gateways)
+3. In OS customisation:
+   - Set username & password
+   - Configure Wi-Fi (if needed)
+   - **Enable SSH**
+4. Write the image, then insert the SD card into the SenseCAP M1 and power on
 
+SSH in with your favourite client (Termius, PuTTY, OpenSSH, etc.).
 
-After Flashing and Verification Completed, Remove SD Card and insert to your SenseCAP M1 sd card slot
+> Need the older Bookworm guide? Use branch [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm).
 
+---
 
-Use your favorite SSH application on your PC such as Terminus, Putty etc. then Connect to SenseCAP M1 IP address Enter your Username and Password
+## 2. Board interfaces & firmware
 
+### Enable interfaces
 
-After Complete SSH Login
-
-## Configuration and Install
-
-**RPi Board Config** 
-
-    sudo raspi-config 
-Then Enable VNC, SPI, I2C and Serial port via **Interface** Menu of The configuration tool. Don't Reboot it Yet
-
-**Update RPi EEPROM**
-  
-    sudo rpi-eeprom-update -a
-
-
-**Increased Swap file to 2GB**
-
-    sudo dphys-swapfile swapoff
-
-    sudo nano /etc/dphys-swapfile
-
-Edit Following Line
-
-> CONF_SWAPSIZE=2048
-
-And Hit Ctrl+X and Ctrl+Y then run
-
-`sudo dphys-swapfile setup`
-
-    sudo dphys-swapfile swapon
-
-**Update to latest Kernel, Software and Lib**
-
-    sudo apt update && sudo apt upgrade -y
-
-**Install Docker, Rootless Permission and Reboot**
-
-    curl -sSL https://get.docker.com | sh && sudo usermod -aG docker $USER && sudo reboot
-
-**Clean Up APT Installation after Reboot**
-
-    sudo apt autoremove -y
-
-**Clone Project Repo** 
-
-    git clone https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
-    
-**Configure LoRaWAN EUID Of WM1302/1303 Module**
-
-Due to Debian 12 The *GPIO sysfs* is deprecated and superseded by *libgpiod*. In this repo this is  my pre-compiled binary for RPi 4 for RPi OS Debian 12 based Works on WM1302 WM1303 module 
-
-    cd SenseCAPM1-Chirpstack/packet_forwarder
-    sudo chmod +x reset_lgw.sh && sudo chmod +x lora_pkt_fwd && sudo chmod +x spectral_scan
-    ./lora_pkt_fwd -c global_conf_as923_th.json
-*
-
-> **For WM1303 Module use file "global_conf_as923_th_sx1303.json" instead
-
-* 
-Watch For *"Concentrator EUI"* Line 
-ex. 
-
-> "INFO: concentrator EUI: 0xXXXXXXXXYYYYYYYY"
->Note It! 
-
-Edit LoRaWAN Driver Config 
-
-    nano global_conf_as923_th.json
-Look at Line 80 
-
-> "gateway_ID": "AA555A0000000000",
-
-Fill your *"Concentrator EUI"*  And Hit Ctrl+X and Ctrl+Y
-
-**Create LoRaWAN Driver Systemd** 
-	
-    sudo nano /etc/systemd/system/lora_pkt_fwd.service
-    
-Copy And Paste Following Line 
-
-    [Unit]
-    Description=Southern IoT AS923 LoraWAN Packet Forwarder Version 01.07.2024 Copyrighted
-    After=network-online.target
-    Wants=network-online.target
-    [Service]
-    Type=simple
-    WorkingDirectory=/home/pi/SenseCAPM1-Chirpstack/packet_forwarder
-    ExecStart=/home/pi/SenseCAPM1-Chirpstack/packet_forwarder/lora_pkt_fwd -c /home/pi/SenseCAPM1-Chirpstack/packet_forwarder/global_conf_as923_th.json
-    Restart=always
-    RestartSec=30
-    StandardOutput=syslog
-    StandardError=syslog
-    SyslogIdentifier=lora_pkt_fwd
-    User=pi
-    [Install]
-    WantedBy=multi-user.target
-
-**Reload systemd Daemon**
-
-    sudo systemctl daemon-reload
-**Start LoRaWAN Driver Now**
-
-    sudo systemctl start lora_pkt_fwd.service
-
-**Check LoRaWAN Driver Status** 
-
-    sudo systemctl status lora_pkt_fwd.service
-    
-   *If no error so you are good to go!* 
-
-**Make LoRaWAN Driver Autostart On Boot**
-
-    sudo systemctl enable lora_pkt_fwd.service
-
-
-**Install Chripstack Docker (This repo are using my pre configured AS923 Frequency for Thailand)**
-
-**Before We Start. What is Chirpstack?** 
-
- [ChirpStack](https://github.com/chirpstack) is an open-source LoRaWAN(R) Network Server which can be used to set up LoRaWAN networks. ChirpStack provides a web-interface for the management of gateways, devices and tenants as well to set up data integrations with the major cloud providers, databases and services commonly used for handling device data. ChirpStack provides a gRPC based API that can be used to integrate or extend ChirpStack.
-
-    cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
-
-    docker compose up -d
-
-Wait for 3-5 mins for Chirpstack to boot up then Browse to your SenseCAP M1 IP Address on port 8080
-
-> Default Login/Password : admin/admin ,, ex. 192.168.1.69:8080
-
-Go to Gateways Menu on The Left, Add Your Gateway with Name, Gateway ID same as Packet Forwarder
-
-**(Optional) Import All LoRaWAN Device in Profile Template into Chirpstack**
-
-    sudo make import-lorawan-devices
-
-
-
-
-For Documentation and other binaries
-
-[](https://github.com/chirpstack/chirpstack#documentation-and-binaries)
-
-Please refer to the [ChirpStack](https://www.chirpstack.io/docs/) website for documentation, API and pre-compiled binaries.
-
-
-**Install Node-Red and Start**
-
-    cd ~/
-    bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
-    
-Config Installation
-
-> Are you really sure you want to do this ? [y/N] ? **y**
-> Would you like to install the Pi-specific nodes ? [y/N] ? **y**
-> Running Node-RED install for user pi at /home/pi 
-> Settings file ‣ /home/pi/.node-red/settings.js (hit Enter)
-
-**Auto Start Node-Red On Boot**
-```
-sudo systemctl enable nodered.service
-```
-Node Red running on port 1880, Use your favorite browser
-
-> ex. 192.168.1.69:1880
-
-## PS
-
-- People Install Desktop Version. You can use your favorite VNC client to control desktop mode on your hotspot such as RealVNC etc.
-
- 
-
-## For Advanced user who want to Connect to multiple LNS Simultaneously 
-
-Install **ChirpStack Packet Multiplexer**
-
-The ChirpStack Packet Multiplexer utility forwards the [Semtech packet-forwarder](https://github.com/lora-net/packet_forwarder) UDP data to multiple endpoints. It makes it possible to connect a single LoRa gateway to multiple networks. It is part of [ChirpStack](https://www.chirpstack.io).
-
-**Ready? Go!** 
-```
-sudo apt install apt-transport-https dirmngr
-```
-```
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
-```
-```
-sudo echo "deb https://artifacts.chirpstack.io/packages/3.x/deb stable main" | sudo tee /etc/apt/sources.list.d/chirpstack.list
-```
-```
-sudo apt update && sudo apt install chirpstack-packet-multiplexer
+```bash
+sudo raspi-config
 ```
 
-To complete the installation, Make directory and update the configuration file which is located at 
+Under **Interface Options**, enable:
 
+- **SPI** (required for WM1302/WM1303)
+- **I2C**
+- **Serial Port** (login shell: No, serial hardware: Yes — if offered)
+- **VNC** (optional, Desktop only)
+
+Do **not** reboot yet if you still have more setup steps below.
+
+### Update EEPROM (recommended)
+
+```bash
+sudo rpi-eeprom-update -a
 ```
-sudo mkdir /etc/chirpstack-packet-multiplexer
+
+### Swap on Trixie (`rpi-swap`)
+
+Trixie replaces `dphys-swapfile` with **`rpi-swap`**. Default hybrid zram+file is usually fine. To force a **2 GiB swap file** (useful when building or running many containers):
+
+```bash
+sudo mkdir -p /etc/rpi/swap.conf.d
+sudo tee /etc/rpi/swap.conf.d/80-swapfile-2g.conf >/dev/null <<'EOF'
+[Main]
+Mechanism=swapfile
+
+[File]
+FixedSizeMiB=2048
+EOF
 ```
+
+Changes apply on the next reboot (`man swap.conf`).
+
+### System packages
+
+```bash
+sudo apt update && sudo apt full-upgrade -y
+sudo apt install -y gpiod git curl ca-certificates
 ```
+
+`gpiod` provides `gpioset` / `gpiodetect` used by the concentrator reset script (**libgpiod 2.x** on Trixie).
+
+### Docker
+
+```bash
+curl -sSL https://get.docker.com | sh
+sudo usermod -aG docker "$USER"
+sudo usermod -aG gpio,spi,dialout "$USER"
+sudo reboot
+```
+
+After reboot:
+
+```bash
+sudo apt autoremove -y
+docker version   # should work without sudo after re-login
+```
+
+---
+
+## 3. Clone this repo
+
+```bash
+cd ~
+git clone https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
+cd SenseCAPM1-Chirpstack
+```
+
+Default branch `main` = **Trixie**. For Bookworm hosts:
+
+```bash
+git clone -b bookworm https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
+```
+
+---
+
+## 4. Packet forwarder (WM1302 / WM1303)
+
+On modern Raspberry Pi OS, **sysfs GPIO is gone**. This repo’s `reset_lgw.sh` uses **libgpiod** and auto-detects:
+
+- **v2** CLI → Trixie  
+- **v1** CLI → Bookworm  
+
+### Make binaries executable
+
+```bash
+cd ~/SenseCAPM1-Chirpstack/packet_forwarder
+chmod +x reset_lgw.sh lora_pkt_fwd spectral_scan
+```
+
+### Read concentrator EUI
+
+WM1302 (SX1302) default config (AS923 Thailand):
+
+```bash
+./lora_pkt_fwd -c global_conf_as923_th.json
+```
+
+WM1303 (SX1303):
+
+```bash
+./lora_pkt_fwd -c global_conf_as923_th_sx1303.json
+```
+
+Watch for:
+
+```text
+INFO: concentrator EUI: 0xXXXXXXXXYYYYYYYY
+```
+
+Note that EUI, then stop with `Ctrl+C`.
+
+### Set Gateway ID in config
+
+```bash
+nano global_conf_as923_th.json   # or the sx1303 file
+```
+
+Find `gateway_ID` (under `gateway_conf`) and set it to your concentrator EUI **without** the `0x` prefix, 16 hex chars, e.g.:
+
+```json
+"gateway_ID": "XXXXXXXXYYYYYYYY",
+```
+
+Save and exit.
+
+> Pre-built `lora_pkt_fwd` is for aarch64 RPi 4. Binaries built against Bookworm glibc normally run on Trixie (newer glibc). If you ever see loader/glibc errors, rebuild from [Lora-net/sx1302_hal](https://github.com/Lora-net/sx1302_hal) on the Pi.
+
+### Install as a systemd service (recommended)
+
+```bash
+cd ~/SenseCAPM1-Chirpstack
+sudo ./scripts/install-lora-service.sh
+```
+
+WM1303:
+
+```bash
+sudo ./scripts/install-lora-service.sh --config global_conf_as923_th_sx1303.json
+```
+
+Custom Linux user:
+
+```bash
+sudo ./scripts/install-lora-service.sh --user youruser --config global_conf_as923_th.json
+```
+
+Check status / logs:
+
+```bash
+sudo systemctl status lora_pkt_fwd.service
+journalctl -u lora_pkt_fwd -f
+```
+
+Manual install template: [`systemd/lora_pkt_fwd.service`](systemd/lora_pkt_fwd.service).
+
+---
+
+## 5. ChirpStack (Docker Compose)
+
+This stack is pre-tuned for **AS923** (Thailand) MQTT topic prefixes. Other regions: edit topic templates in `chirpstack-docker/docker-compose.yml` and region files under `configuration/`.
+
+### What is ChirpStack?
+
+[ChirpStack](https://www.chirpstack.io) is an open-source LoRaWAN Network Server with a web UI for gateways, devices, tenants, and integrations, plus a gRPC API.
+
+### Start the stack
+
+```bash
+cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
+docker compose up -d
+```
+
+Wait 1–3 minutes, then open:
+
+```text
+http://<sensecap-ip>:8080
+```
+
+Default login: **admin / admin** — change this immediately on any network that is not fully trusted.
+
+### Register the gateway
+
+1. Left menu → **Gateways** → add gateway  
+2. **Gateway ID** = same EUI as in the packet-forwarder config  
+
+### (Optional) Import device profiles from lorawan-devices
+
+```bash
+cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
+sudo apt install -y make
+make import-lorawan-devices
+```
+
+Docs: https://www.chirpstack.io/docs/
+
+---
+
+## 6. Node-RED (optional)
+
+```bash
+cd ~
+bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
+```
+
+Answer the prompts (install Pi-specific nodes if you want). Then:
+
+```bash
+sudo systemctl enable --now nodered.service
+```
+
+UI: `http://<sensecap-ip>:1880`
+
+---
+
+## 7. Advanced: multi-LNS with Packet Multiplexer
+
+[ChirpStack Packet Multiplexer](https://github.com/chirpstack/chirpstack-packet-multiplexer) forwards Semtech UDP packet-forwarder traffic to **multiple** network servers (private ChirpStack + TTN, etc.).
+
+### Install (ChirpStack 4.x apt repo — Trixie-safe, no `apt-key`)
+
+```bash
+sudo apt install -y gpg wget apt-transport-https
+sudo mkdir -p /etc/apt/keyrings
+sudo sh -c 'wget -q -O - https://artifacts.chirpstack.io/packages/chirpstack.key | gpg --dearmor -o /etc/apt/keyrings/chirpstack.gpg'
+echo "deb [signed-by=/etc/apt/keyrings/chirpstack.gpg] https://artifacts.chirpstack.io/packages/4.x/deb stable main" | sudo tee /etc/apt/sources.list.d/chirpstack.list
+sudo apt update
+sudo apt install -y chirpstack-packet-multiplexer
+```
+
+### Configure
+
+Template in this repo (v4 TOML format):
+
+```bash
+sudo mkdir -p /etc/chirpstack-packet-multiplexer
+sudo cp ~/SenseCAPM1-Chirpstack/chirpstack-packet-multiplexer.toml \
+  /etc/chirpstack-packet-multiplexer/chirpstack-packet-multiplexer.toml
 sudo nano /etc/chirpstack-packet-multiplexer/chirpstack-packet-multiplexer.toml
 ```
-The Configuration Template I provided in this repo.
 
+Default template binds on **`:17000`** so it does not clash with Gateway Bridge on **`:1700`**. Point the packet forwarder `serv_port_up` / `serv_port_down` to **17000** when using the multiplexer.
 
-## Bonus
+```bash
+sudo systemctl enable --now chirpstack-packet-multiplexer
+sudo systemctl status chirpstack-packet-multiplexer
+```
 
-You with this you can Install **Mysterium** node on your SenseCAP M1
+---
 
-**What is a Mysterium Network Node?** 
-**Network nodes are devices, such as this Raspberry Pi, which help power and maintain Mysterium distributed network**. Any user of the network can pay to connect to your node, providing them with a VPN service, access to the open internet and a secure line of communication.
+## 8. Bonus: Mysterium node
 
-Run Following command
+```bash
+sudo -E bash -c "$(curl -s https://raw.githubusercontent.com/mysteriumnetwork/node/master/install.sh)"
+sudo reboot
+```
 
-    sudo -E bash -c "$(curl -s https://raw.githubusercontent.com/mysteriumnetwork/node/master/install.sh)"
+After 5–10 minutes: `http://<sensecap-ip>:4449`
 
-In addition to downloading and installing our Node on your Raspberry Pi, this command will also install additional required dependencies like WireGuard if you don't have it already.
+---
 
-Reboot and Wait for 5-10 minutes for myst node to Start then browse to SenseCAP M1 IP Address with port 4449 in your favorite browser or use VNC connect to your hotspot 
-ex.
+## Desktop / VNC
 
-> 192.168.1.69:4449
+If you installed Desktop, use any VNC client (or Raspberry Pi Connect, where available) to control the UI remotely.
 
+---
+
+## Trixie migration notes (from Bookworm)
+
+| Area | Bookworm | Trixie (`main`) |
+|------|----------|-----------------|
+| Base OS | Debian 12 | Debian 13 |
+| Swap | `dphys-swapfile` / `/etc/dphys-swapfile` | `rpi-swap` / `/etc/rpi/swap.conf(.d)` |
+| GPIO tools | libgpiod **1.x** (`gpioset -m time …`) | libgpiod **2.x** (`gpioset -c … --hold-period … -t0`) |
+| Reset script | v1 syntax only | Auto-detects v1 and v2 |
+| Packet multiplexer apt | 3.x + deprecated `apt-key` | **4.x** + `/etc/apt/keyrings` |
+| Multiplexer config | `[packet_multiplexer]` / `backend` | `[multiplexer]` / `[[multiplexer.server]]` |
+| Docker Compose | optional `version:` key | Compose Spec (no `version`) |
+| Images | postgres 14, floating `latest` | postgres **16**, ChirpStack major **4** tags |
+
+---
+
+## Repo layout
+
+```text
+SenseCAPM1-Chirpstack/
+├── packet_forwarder/          # Semtech UDP PF + global_conf + reset_lgw.sh
+├── chirpstack-docker/         # ChirpStack v4 Docker Compose stack
+├── scripts/install-lora-service.sh
+├── systemd/lora_pkt_fwd.service
+└── chirpstack-packet-multiplexer.toml
+```
+
+---
 
 ## Made in Phatthalung, Thailand.
-

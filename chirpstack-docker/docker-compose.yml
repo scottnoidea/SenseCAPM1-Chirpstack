@@ -1,8 +1,6 @@
-version: "3"
-
 services:
   chirpstack:
-    image: chirpstack/chirpstack:latest
+    image: chirpstack/chirpstack:4
     command: -c /etc/chirpstack
     restart: unless-stopped
     volumes:
@@ -17,44 +15,45 @@ services:
       - REDIS_HOST=redis
       - POSTGRESQL_HOST=postgres
     ports:
-      - 8080:8080
+      - "8080:8080"
 
   chirpstack-gateway-bridge:
-    image: chirpstack/chirpstack-gateway-bridge:latest
+    image: chirpstack/chirpstack-gateway-bridge:4
     restart: unless-stopped
     ports:
-      - 1700:1700/udp
+      - "1700:1700/udp"
     volumes:
       - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
     environment:
+      # Pre-configured for AS923 (Thailand). Change topic prefix for other regions.
       - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=as923/gateway/{{ .GatewayID }}/event/{{ .EventType }}
       - INTEGRATION__MQTT__STATE_TOPIC_TEMPLATE=as923/gateway/{{ .GatewayID }}/state/{{ .StateType }}
       - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=as923/gateway/{{ .GatewayID }}/command/#
     depends_on:
       - mosquitto
-  
+
   chirpstack-gateway-bridge-basicstation:
-    image: chirpstack/chirpstack-gateway-bridge:latest
+    image: chirpstack/chirpstack-gateway-bridge:4
     restart: unless-stopped
     command: -c /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge-basicstation-as923.toml
     ports:
-      - 3001:3001
+      - "3001:3001"
     volumes:
       - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
     depends_on:
       - mosquitto
 
   chirpstack-rest-api:
-    image: chirpstack/chirpstack-rest-api:latest
+    image: chirpstack/chirpstack-rest-api:4
     restart: unless-stopped
     command: --server chirpstack:8080 --bind 0.0.0.0:8090 --insecure
     ports:
-      - 8090:8090
+      - "8090:8090"
     depends_on:
       - chirpstack
 
   postgres:
-    image: postgres:14-alpine
+    image: postgres:16-alpine
     restart: unless-stopped
     volumes:
       - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
@@ -70,11 +69,11 @@ services:
       - redisdata:/data
 
   mosquitto:
-    image: eclipse-mosquitto:latest
+    image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
-      - 1883:1883
-    volumes: 
+      - "1883:1883"
+    volumes:
       - ./configuration/mosquitto/config/:/mosquitto/config/
 
 volumes:

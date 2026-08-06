@@ -1,0 +1,25 @@
+[Unit]
+Description=SenseCAP M1 SX1302/SX1303 Semtech UDP Packet Forwarder
+Documentation=https://github.com/hereismeaw/SenseCAPM1-Chirpstack
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Paths and User are filled by scripts/install-lora-service.sh
+# Or edit WorkingDirectory / ExecStart / User manually after install.
+WorkingDirectory=%h/SenseCAPM1-Chirpstack/packet_forwarder
+ExecStart=%h/SenseCAPM1-Chirpstack/packet_forwarder/lora_pkt_fwd -c %h/SenseCAPM1-Chirpstack/packet_forwarder/global_conf_as923_th.json
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lora_pkt_fwd
+# Prefer a dedicated non-root user that is in groups: gpio, spi, dialout
+User=REPLACE_ME
+
+# Ensure concentrator is reset before start (optional, requires gpiod)
+# ExecStartPre=%h/SenseCAPM1-Chirpstack/packet_forwarder/reset_lgw.sh start
+
+[Install]
+WantedBy=multi-user.target

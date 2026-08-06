@@ -1,28 +1,49 @@
-[general]
-# debug=5, info=4, warning=3, error=2, fatal=1, panic=0
-log_level=4
+# ChirpStack Packet Multiplexer v4 configuration template
+# Docs: https://github.com/chirpstack/chirpstack-packet-multiplexer
+#
+# Install (Debian / Raspberry Pi OS):
+#   sudo apt install gpg
+#   sudo mkdir -p /etc/apt/keyrings
+#   sudo sh -c 'wget -q -O - https://artifacts.chirpstack.io/packages/chirpstack.key | gpg --dearmor -o /etc/apt/keyrings/chirpstack.gpg'
+#   echo "deb [signed-by=/etc/apt/keyrings/chirpstack.gpg] https://artifacts.chirpstack.io/packages/4.x/deb stable main" | sudo tee /etc/apt/sources.list.d/chirpstack.list
+#   sudo apt update && sudo apt install chirpstack-packet-multiplexer
+#
+# Copy this file to:
+#   /etc/chirpstack-packet-multiplexer/chirpstack-packet-multiplexer.toml
+#
+# When using the multiplexer:
+#   - Point Semtech UDP packet-forwarder to this bind port (default below: 17000)
+#   - ChirpStack Gateway Bridge / other LNS stay on their usual ports (e.g. 1700)
 
-[packet_multiplexer]
-bind="0.0.0.0:17000"
+[logging]
+  # TRACE | DEBUG | INFO | WARN | ERROR
+  level = "info"
 
-[[packet_multiplexer.backend]]
-# Chirpstack
-host="localhost:1700"
-uplink_only=false
-# The Gateway IDs to forward data for.
-gateway_ids = 
-	[
-  		"0101010101010101",
-  		"0202020202020202",
-	]
+[multiplexer]
+  # Listen for Semtech UDP packet-forwarder traffic here
+  # (use a free port so it does not clash with chirpstack-gateway-bridge on 1700)
+  bind = "0.0.0.0:17000"
 
-[[packet_multiplexer.backend]]
-# TTN Australia 
-host="au1.cloud.thethings.network:1700"
-uplink_only=false
-# The Gateway IDs to forward data for.
-gateway_ids = 
-	[
-  		"0101010101010101",
-  		"0202020202020202",
-	]
+  # --- Backend: local ChirpStack (Gateway Bridge UDP) ---
+  [[multiplexer.server]]
+    server = "127.0.0.1:1700"
+    uplink_only = false
+    # Empty = forward all gateways. Example exact match:
+    # gateway_id_prefixes = ["AA555A0000000000/32"]
+    gateway_id_prefixes = []
+
+  # --- Backend: The Things Network (example: Australia) ---
+  [[multiplexer.server]]
+    server = "au1.cloud.thethings.network:1700"
+    # Typically uplink-only when also serving a private LNS with downlinks
+    uplink_only = true
+    gateway_id_prefixes = []
+
+    # Optional filters (leave empty to disable)
+    [multiplexer.server.filters]
+      dev_addr_prefixes = []
+      join_eui_prefixes = []
+
+# Optional Prometheus metrics endpoint (empty = disabled)
+[monitoring]
+  bind = ""

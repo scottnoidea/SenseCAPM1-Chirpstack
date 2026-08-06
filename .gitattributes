@@ -1,2 +1,10 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Shell scripts must use LF on checkout (Raspberry Pi / Linux)
+*.sh text eol=lf
+packet_forwarder/reset_lgw.sh text eol=lf
+scripts/* text eol=lf
+
+# systemd units
+*.service text eol=lf
