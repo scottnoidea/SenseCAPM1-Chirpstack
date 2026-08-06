@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, bookworm]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scripts:
+    name: Script & config syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Make check script executable
+        run: chmod +x scripts/check-syntax.sh scripts/install-lora-service.sh packet_forwarder/reset_lgw.sh
+
+      - name: Run syntax checks
+        run: ./scripts/check-syntax.sh
+
+      - name: Validate Docker Compose (full)
+        working-directory: chirpstack-docker
+        run: docker compose -f docker-compose.yml config --quiet

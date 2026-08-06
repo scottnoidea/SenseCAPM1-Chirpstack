@@ -339,9 +339,28 @@ If you installed Desktop, use any VNC client (or Raspberry Pi Connect, where ava
 SenseCAPM1-Chirpstack/
 ├── packet_forwarder/          # Semtech UDP PF + global_conf + reset_lgw.sh
 ├── chirpstack-docker/         # ChirpStack v4 Docker Compose stack
-├── scripts/install-lora-service.sh
+├── scripts/
+│   ├── install-lora-service.sh
+│   └── check-syntax.sh        # local + CI syntax checks
 ├── systemd/lora_pkt_fwd.service
+├── .github/workflows/ci.yml
 └── chirpstack-packet-multiplexer.toml
+```
+
+## CI / local syntax checks
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main` and `bookworm`:
+
+- `bash -n` / `sh -n` on every `*.sh`
+- [ShellCheck](https://www.shellcheck.net/)
+- `python -m py_compile` for `packet_forwarder/*.py`
+- `docker compose config` for the ChirpStack stack
+- basic systemd unit layout check
+
+Run the same suite locally:
+
+```bash
+./scripts/check-syntax.sh
 ```
 
 ---
