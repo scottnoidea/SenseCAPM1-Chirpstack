@@ -18,7 +18,7 @@
     # Force gateways as private.
     #
     # If enabled, gateways can only be used by devices under the same tenant.
-    force_gws_private=false
+    force_gws_private=true
 
     
     # Gateway backend configuration.
@@ -203,7 +203,7 @@
     # Please consult the LoRaWAN Regional Parameters and local regulations
     # for valid and legal options. Note that the configured TX Power must be
     # supported by your gateway(s).
-    downlink_tx_power=-1
+    downlink_tx_power=27
 
     # ADR is disabled.
     adr_disabled=false
@@ -212,7 +212,7 @@
     min_dr=0
 
     # Maximum data-rate.
-    max_dr=5
+    max_dr=6
 
     # Enabled uplink channels.
     #

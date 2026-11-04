@@ -1,0 +1,4 @@
+The AU915 configuration is derived from the repository's original configuration:
+Copyrighted 2024 Southern IoT.
+Hardware calibration and gateway settings have been retained; radio channel centres
+were corrected for Australian AU915 FSB2 and the file converted to strict JSON.

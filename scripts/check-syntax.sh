@@ -165,42 +165,25 @@ if [[ -f "$COMPOSE_FILE" ]]; then
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     if (
       cd "$REPO_ROOT/chirpstack-docker"
-      docker compose -f docker-compose.yml config --quiet
+      CHIRPSTACK_API_SECRET="${CHIRPSTACK_API_SECRET:-syntax-check-only}" docker compose --env-file /dev/null -f docker-compose.yml config --quiet
     ) 2>/tmp/sensecap-compose.err; then
       pass "chirpstack-docker/docker-compose.yml — docker compose config"
     else
       fail "chirpstack-docker/docker-compose.yml — docker compose config"
       sed 's/^/    /' /tmp/sensecap-compose.err || true
     fi
-  elif command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
-    # Fallback: YAML parse only (structure, not full Compose semantics)
-    PY_BIN="$(command -v python3 || command -v python)"
-    if "$PY_BIN" - <<'PY' "$COMPOSE_FILE" 2>/tmp/sensecap-compose.err
-import sys
-path = sys.argv[1]
-try:
-    import yaml  # type: ignore
-except ImportError:
-    # Minimal structural check without PyYAML: require top-level "services:"
-    text = open(path, encoding="utf-8").read()
-    if "services:" not in text:
-        raise SystemExit("missing top-level services: key")
-    sys.exit(0)
-data = yaml.safe_load(open(path, encoding="utf-8"))
-if not isinstance(data, dict) or "services" not in data:
-    raise SystemExit("compose file must define services")
-PY
-    then
-      pass "chirpstack-docker/docker-compose.yml — YAML/structure check"
-    else
-      fail "chirpstack-docker/docker-compose.yml — YAML/structure check"
-      sed 's/^/    /' /tmp/sensecap-compose.err || true
-    fi
   else
-    info "docker/python not available — skip compose check"
+    fail "Docker Compose plugin required for full configuration validation"
   fi
 else
   fail "chirpstack-docker/docker-compose.yml missing"
+fi
+
+section "JSON, TOML and AU915 FSB2 consistency"
+if python3 "$REPO_ROOT/scripts/validate-config.py"; then
+  pass "JSON / TOML / AU915 consistency"
+else
+  fail "JSON / TOML / AU915 consistency"
 fi
 
 # ---------------------------------------------------------------------------
@@ -208,23 +191,18 @@ fi
 # ---------------------------------------------------------------------------
 section "systemd unit"
 
-UNIT="$REPO_ROOT/systemd/lora_pkt_fwd.service"
-if [[ -f "$UNIT" ]]; then
-  rel="systemd/lora_pkt_fwd.service"
-  if grep -q $'\r' "$UNIT" 2>/dev/null; then
+for UNIT in "$REPO_ROOT"/systemd/*.service; do
+  rel="${UNIT#"$REPO_ROOT"/}"
+  if grep -q $'\r' "$UNIT"; then
     fail "$rel — contains CRLF line endings"
-  elif ! grep -q '^\[Unit\]' "$UNIT"; then
-    fail "$rel — missing [Unit] section"
-  elif ! grep -q '^\[Service\]' "$UNIT"; then
-    fail "$rel — missing [Service] section"
-  elif ! grep -q '^\[Install\]' "$UNIT"; then
-    fail "$rel — missing [Install] section"
+  elif ! grep -q '^\[Unit\]' "$UNIT" ||
+       ! grep -q '^\[Service\]' "$UNIT" ||
+       ! grep -q '^\[Install\]' "$UNIT"; then
+    fail "$rel — missing required sections"
   else
     pass "$rel — basic section layout"
   fi
-else
-  info "no systemd unit template found"
-fi
+done
 
 # ---------------------------------------------------------------------------
 # Summary

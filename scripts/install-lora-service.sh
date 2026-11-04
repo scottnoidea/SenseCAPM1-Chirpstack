@@ -5,8 +5,8 @@
 # Usage:
 #   cd ~/SenseCAPM1-Chirpstack
 #   ./scripts/install-lora-service.sh
-#   ./scripts/install-lora-service.sh --config global_conf_as923_th_sx1303.json
-#   ./scripts/install-lora-service.sh --user myuser --config global_conf_as923_th.json
+#   ./scripts/install-lora-service.sh --config /etc/sensecap-m1/global_conf.json
+#   ./scripts/install-lora-service.sh --user myuser --config /etc/sensecap-m1/global_conf.json
 
 set -euo pipefail
 
@@ -17,7 +17,7 @@ SERVICE_NAME="lora_pkt_fwd.service"
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
 
 RUN_USER="${SUDO_USER:-${USER}}"
-CONFIG_FILE="global_conf_as923_th.json"
+CONFIG_FILE="/etc/sensecap-m1/global_conf.json"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,7 +50,16 @@ if ! id "$RUN_USER" &>/dev/null; then
   exit 1
 fi
 
-CONFIG_PATH="${PF_DIR}/${CONFIG_FILE}"
+if [[ "$CONFIG_FILE" = /* ]]; then
+  CONFIG_PATH="$CONFIG_FILE"
+else
+  CONFIG_PATH="${PF_DIR}/${CONFIG_FILE}"
+fi
+# systemd treats whitespace and % specially; reject unsupported install paths.
+if [[ "$PF_DIR$CONFIG_PATH" =~ [[:space:]%] ]]; then
+  echo "Install paths must not contain whitespace or %." >&2
+  exit 1
+fi
 if [[ ! -f "$CONFIG_PATH" ]]; then
   echo "Config not found: $CONFIG_PATH" >&2
   exit 1
@@ -93,7 +102,8 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now "$SERVICE_NAME"
+systemctl enable "$SERVICE_NAME"
+systemctl restart "$SERVICE_NAME"
 
 echo
 echo "Installed and started ${SERVICE_NAME}"

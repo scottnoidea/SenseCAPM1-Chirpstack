@@ -1,382 +1,140 @@
-# SenseCAP M1 → ChirpStack
+# SenseCAP M1 private Australian LoRaWAN network
 
-Repurpose a **Seeed SenseCAP M1** (Raspberry Pi 4 + WM1302/WM1303 LoRa concentrator) as a private [ChirpStack](https://www.chirpstack.io) LoRaWAN gateway and network server.
+Run a Seeed SenseCAP M1 (Raspberry Pi 4, **WM1302 / SX1302 with SX1250 radios over SPI**) as a private ChirpStack v4 AU915 **FSB2** gateway and network server. Use a 915 MHz concentrator and antenna. The supplied aarch64 packet-forwarder binary is retained; rebuild from [Semtech sx1302_hal](https://github.com/Lora-net/sx1302_hal) if needed for your OS.
 
-Built for people who still have the hardware, but not the Helium wallet keys — and would rather run real LoRaWAN than leave a good radio in a drawer.
+The deployment contains ChirpStack's [official SQLite image](https://www.chirpstack.io/docs/chirpstack/downloads.html), Redis, Mosquitto and one Semtech UDP Gateway Bridge. SQLite stores network configuration; Redis persists sessions, metrics and cache. There is no PostgreSQL, Basic Station bridge or REST API container. ChirpStack's native web UI and gRPC API remain on port 8080.
 
-| Branch | Target OS |
-|--------|-----------|
-| **`main`** (this branch) | **Raspberry Pi OS on Debian 13 Trixie** (recommended) |
-| [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) | Raspberry Pi OS Bookworm (Debian 12) — legacy |
+## Channel plan
 
-**Hardware:** SenseCAP M1 = RPi 4 + Semtech SX1302 (WM1302) or SX1303 (WM1303) over SPI.
+| Channels | Frequencies | Bandwidth |
+|---|---|---|
+| 8–15 | 916.8, 917.0, 917.2, 917.4, 917.6, 917.8, 918.0, 918.2 MHz | 125 kHz |
+| 65 | 917.5 MHz, SF8 (DR6) | 500 kHz |
 
-**Current release:** [**v2.0.0**](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/releases/tag/v2.0.0) — Trixie support, ChirpStack 4, CI, install helpers. See [CHANGELOG.md](CHANGELOG.md).
+ChirpStack region ID and gateway MQTT prefix are both `au915_1` (FSB2). End devices must use **AU915 FSB2**, not US915 or AS923. RX2 is 923.3 MHz / DR8. The two radio centres are 917.1 and 917.9 MHz. Receive channels are set in the packet-forwarder JSON; the region TOML alone cannot retune a Semtech UDP gateway.
 
----
+The original RSSI calibration, temperature compensation, TX gain table, SPI settings, gateway ID and GPIO reset helper are retained. Downlink power is set to 27 dBm, the highest calibrated entry in this board's table. Set antenna gain and transmit power to suit your actual installation. `lorawan_public=true` selects the standard LoRaWAN sync word, including for this private network; tenant privacy is separately enabled with `force_gws_private=true`.
 
-## Lost Helium seed phrase?
+## Installation
 
-**There is no recovery.**  
-The Helium app is explicit about this during setup, which is why it ships with a write-down card. If those words are gone, the wallet is gone.
-
-Official warning: https://docs.helium.com/wallets/wallet-seed-phrase
-
-The good news: the gateway hardware is still useful. SPI, the concentrator, and Linux all still work. HNT may be out of reach, but **LoRaWAN is not** — and with ChirpStack, you run the network server yourself.
-
-### Requirements
-
-1. SenseCAP M1 (lost keys, retired miner, or intentional repurpose)
-2. Basic Linux command line
-3. Micro SD card reader
-4. Decent quality SD card (A2 / high endurance recommended)
-5. A bit of time
-
----
-
-## 1. Flash Raspberry Pi OS (Trixie)
-
-Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
-
-1. Board: **Raspberry Pi 4**
-2. OS: **Raspberry Pi OS (64-bit)** — description should mention **Debian Trixie**  
-   - Lite is enough for headless gateways  
-   - Desktop is fine if you want a GUI
-3. In OS customisation:
-   - Set username and password
-   - Configure Wi-Fi if needed
-   - **Enable SSH**
-4. Write the image, insert the SD into the M1, power on
-
-SSH in with Termius, PuTTY bla bla.
-
-> Still on Bookworm? Use branch [`bookworm`](https://github.com/hereismeaw/SenseCAPM1-Chirpstack/tree/bookworm) instead of following `main`.
-
----
-
-## 2. Board setup
-
-### Enable interfaces
+Use Raspberry Pi OS **64-bit Trixie**, with SSH enabled. Enable SPI using `sudo raspi-config`, then reboot. Install prerequisites and Docker Engine with its Compose plugin ([Docker instructions](https://docs.docker.com/engine/install/debian/)):
 
 ```bash
-sudo raspi-config
-```
-
-Under **Interface Options**, enable:
-
-- **SPI** (required for WM1302/WM1303)
-- **I2C**
-- **Serial Port** (login shell: No / hardware serial: Yes, if asked)
-- **VNC** (optional, Desktop only)
-
-Finish the steps below before rebooting.
-
-### Update EEPROM (recommended)
-
-```bash
-sudo rpi-eeprom-update -a
-```
-
-### Swap on Trixie (`rpi-swap`)
-
-Trixie uses **`rpi-swap`** instead of `dphys-swapfile`. Defaults are fine for many installs. For a fixed **2 GiB** swap file (helpful with Docker):
-
-```bash
-sudo mkdir -p /etc/rpi/swap.conf.d
-sudo tee /etc/rpi/swap.conf.d/80-swapfile-2g.conf >/dev/null <<'EOF'
-[Main]
-Mechanism=swapfile
-
-[File]
-FixedSizeMiB=2048
-EOF
-```
-
-Applies after reboot (`man swap.conf`).
-
-### Base packages
-
-```bash
-sudo apt update && sudo apt full-upgrade -y
-sudo apt install -y gpiod git curl ca-certificates
-```
-
-`gpiod` provides the modern GPIO tools. Trixie ships **libgpiod 2.x** (different CLI from Bookworm’s 1.x). This repo’s reset script supports both.
-
-### Docker
-
-```bash
-curl -sSL https://get.docker.com | sh
-sudo usermod -aG docker "$USER"
-sudo usermod -aG gpio,spi,dialout "$USER"
-sudo reboot
-```
-
-After reboot:
-
-```bash
-sudo apt autoremove -y
-docker version   # should work without sudo after re-login
-```
-
----
-
-## 3. Clone this repo
-
-```bash
-cd ~
-git clone https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
-cd SenseCAPM1-Chirpstack
-```
-
-`main` = Trixie. For Bookworm:
-
-```bash
-git clone -b bookworm https://github.com/hereismeaw/SenseCAPM1-Chirpstack.git
-```
-
----
-
-## 4. Packet forwarder (WM1302 / WM1303)
-
-Sysfs GPIO is gone on modern Raspberry Pi OS.  
-`reset_lgw.sh` uses **libgpiod** and auto-detects:
-
-- **v2** → Trixie  
-- **v1** → Bookworm  
-
-### Make binaries executable
-
-```bash
-cd ~/SenseCAPM1-Chirpstack/packet_forwarder
-chmod +x reset_lgw.sh lora_pkt_fwd spectral_scan
-```
-
-### Read concentrator EUI
-
-WM1302 (SX1302), AS923 Thailand config:
-
-```bash
-./lora_pkt_fwd -c global_conf_as923_th.json
-```
-
-WM1303 (SX1303):
-
-```bash
-./lora_pkt_fwd -c global_conf_as923_th_sx1303.json
-```
-
-Note the line:
-
-```text
-INFO: concentrator EUI: 0xXXXXXXXXYYYYYYYY
-```
-
-Then stop with `Ctrl+C`.
-
-### Set Gateway ID
-
-```bash
-nano global_conf_as923_th.json   # or the sx1303 file
-```
-
-Under `gateway_conf`, set `gateway_ID` to the EUI **without** the `0x` prefix (16 hex characters):
-
-```json
-"gateway_ID": "XXXXXXXXYYYYYYYY",
-```
-
-> Prebuilt `lora_pkt_fwd` is aarch64 for RPi 4. Bookworm-built binaries usually run on Trixie. If you hit glibc/loader errors, rebuild from [sx1302_hal](https://github.com/Lora-net/sx1302_hal) on the Pi.
-
-### Install as a systemd service (recommended)
-
-```bash
-cd ~/SenseCAPM1-Chirpstack
-sudo ./scripts/install-lora-service.sh
-```
-
-WM1303:
-
-```bash
-sudo ./scripts/install-lora-service.sh --config global_conf_as923_th_sx1303.json
-```
-
-Custom user:
-
-```bash
-sudo ./scripts/install-lora-service.sh --user youruser --config global_conf_as923_th.json
-```
-
-Status / logs:
-
-```bash
-sudo systemctl status lora_pkt_fwd.service
-journalctl -u lora_pkt_fwd -f
-```
-
-Manual template: [`systemd/lora_pkt_fwd.service`](systemd/lora_pkt_fwd.service).
-
----
-
-## 5. ChirpStack (Docker Compose)
-
-Pre-configured for **AS923 (Thailand)**. For other regions, edit MQTT topic templates in `chirpstack-docker/docker-compose.yml` and the region files under `configuration/`.
-
-### What is ChirpStack?
-
-[ChirpStack](https://www.chirpstack.io) is an open-source LoRaWAN Network Server with a web UI for gateways, devices, tenants, and integrations, plus a gRPC API.
-
-### Start the stack
-
-```bash
-cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
-docker compose up -d
-```
-
-Wait 1–3 minutes, then open:
-
-```text
-http://<m1-ip>:8080
-```
-
-Default login: **admin / admin** — change this if the host is reachable beyond a trusted LAN.
-
-### Register the gateway
-
-1. Left menu → **Gateways** → add  
-2. **Gateway ID** = same EUI as in the packet-forwarder config  
-
-### (Optional) Import device profiles
-
-```bash
-cd ~/SenseCAPM1-Chirpstack/chirpstack-docker
-sudo apt install -y make
-make import-lorawan-devices
-```
-
-Docs: https://www.chirpstack.io/docs/
-
----
-
-## 6. Node-RED (optional)
-
-```bash
-cd ~
-bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
-```
-
-Answer the prompts (Pi-specific nodes if you want), then:
-
-```bash
-sudo systemctl enable --now nodered.service
-```
-
-UI: `http://<ip>:1880`
-
----
-
-## 7. Advanced: multiple LNS with Packet Multiplexer
-
-[ChirpStack Packet Multiplexer](https://github.com/chirpstack/chirpstack-packet-multiplexer) forwards Semtech UDP traffic to several backends (e.g. private ChirpStack + TTN).
-
-### Install (ChirpStack 4.x apt repo)
-
-```bash
-sudo apt install -y gpg wget apt-transport-https
-sudo mkdir -p /etc/apt/keyrings
-sudo sh -c 'wget -q -O - https://artifacts.chirpstack.io/packages/chirpstack.key | gpg --dearmor -o /etc/apt/keyrings/chirpstack.gpg'
-echo "deb [signed-by=/etc/apt/keyrings/chirpstack.gpg] https://artifacts.chirpstack.io/packages/4.x/deb stable main" | sudo tee /etc/apt/sources.list.d/chirpstack.list
 sudo apt update
-sudo apt install -y chirpstack-packet-multiplexer
+sudo apt install -y git gpiod python3
+# Install Docker Engine and the Compose plugin before continuing.
+docker compose version
 ```
 
-### Configure
+Clone your fork onto the M1 into a path without spaces or `%`, then enter its root directory. The installers use its absolute path; keep the checkout there after installation.
+
+### Configure gateway identity
+
+Read the gateway EUI from your existing working configuration, or read the concentrator EUI with the retained binary:
 
 ```bash
-sudo mkdir -p /etc/chirpstack-packet-multiplexer
-sudo cp ~/SenseCAPM1-Chirpstack/chirpstack-packet-multiplexer.toml \
-  /etc/chirpstack-packet-multiplexer/chirpstack-packet-multiplexer.toml
-sudo nano /etc/chirpstack-packet-multiplexer/chirpstack-packet-multiplexer.toml
+cd packet_forwarder
+chmod +x lora_pkt_fwd reset_lgw.sh
+sudo ./reset_lgw.sh start
+sudo ./lora_pkt_fwd -c global_conf_au915.json
+# Note “concentrator EUI: 0x...” and stop with Ctrl+C.
+cd ..
+sudo ./scripts/configure.sh --gateway-id YOUR_16_HEX_DIGIT_EUI
 ```
 
-Default template binds on **`:17000`** so it does not clash with Gateway Bridge on **`:1700`**.  
-When using the multiplexer, point packet-forwarder `serv_port_up` / `serv_port_down` to **17000**.
+Stop any existing packet-forwarder service before accessing the concentrator manually. Use the same gateway ID already registered with your private network if it differs from the concentrator EUI. `AA555A0000000000` is the repository's existing example ID; configure.sh preserves it when no ID is supplied, so explicitly set your actual ID on first installation.
 
-```bash
-sudo systemctl enable --now chirpstack-packet-multiplexer
-sudo systemctl status chirpstack-packet-multiplexer
-```
+The configuration script:
 
----
+- Creates `/etc/sensecap-m1/global_conf.json` from the AU915 template on first use.
+- Preserves the existing runtime gateway identity, server address, ports and calibration on reruns, while applying the FSB2 receive channel plan. `--gateway-id` deliberately overrides the ID.
+- Creates a random API signing secret in `chirpstack-docker/.env` only if that file does not already exist.
+- Prepares `chirpstack-docker/data/chirpstack/` for the official image's UID/GID 65534. Data and `.env` are ignored by Git.
 
-## 8. Bonus: Mysterium node
+Edit `/etc/sensecap-m1/global_conf.json` for user settings (gateway identity, position, server address and antenna gain). Leave checked-in calibration in `packet_forwarder/global_conf_au915.json` alone unless changing hardware. The default destination is localhost:1700. If reusing an older runtime file, check its destination still matches this deployment.
 
-```bash
-sudo -E bash -c "$(curl -s https://raw.githubusercontent.com/mysteriumnetwork/node/master/install.sh)"
-sudo reboot
-```
-
-After 5–10 minutes: `http://<ip>:4449`
-
----
-
-## Desktop / VNC
-
-If you installed Desktop, use a VNC client or Raspberry Pi Connect for remote GUI access.
-
----
-
-## Bookworm → Trixie migration notes
-
-| Topic | Bookworm | Trixie (`main`) |
-|-------|----------|-----------------|
-| Base OS | Debian 12 | Debian 13 |
-| Swap | `dphys-swapfile` | `rpi-swap` |
-| GPIO CLI | libgpiod **1.x** | libgpiod **2.x** |
-| `reset_lgw.sh` | v1-oriented | auto-detects v1 and v2 |
-| Multiplexer apt | 3.x + deprecated `apt-key` | **4.x** + `/etc/apt/keyrings` |
-| Multiplexer config | v3 TOML shape | v4 `[multiplexer]` / `[[multiplexer.server]]` |
-| Docker Compose | optional `version:` key | Compose Spec (no `version`) |
-| Images | postgres 14 / floating `latest` | postgres **16** / ChirpStack major **4** |
-
----
-
-## Repo layout
-
-```text
-SenseCAPM1-Chirpstack/
-├── packet_forwarder/          # Semtech UDP PF + configs + reset
-├── chirpstack-docker/         # ChirpStack v4 Compose stack
-├── scripts/
-│   ├── install-lora-service.sh
-│   └── check-syntax.sh
-├── systemd/lora_pkt_fwd.service
-├── .github/workflows/ci.yml
-├── CHANGELOG.md
-└── chirpstack-packet-multiplexer.toml
-```
-
-## CI / local checks
-
-GitHub Actions runs on push/PR to `main` and `bookworm`:
-
-- `bash -n` / `sh -n` on shell scripts  
-- ShellCheck  
-- `python -m py_compile`  
-- `docker compose config`  
-- basic systemd unit layout check  
-
-Run locally:
+### Validate and install services
 
 ```bash
 ./scripts/check-syntax.sh
+sudo ./scripts/install-chirpstack-service.sh
+sudo ./scripts/install-lora-service.sh --user "$USER"
 ```
 
----
+The stack installer runs Compose validation before installing `chirpstack-compose.service`, starts Docker after networking and starts the four containers. The packet-forwarder installer adds the service user to available `gpio`, `spi` and `dialout` groups, resets the concentrator before each start, and restarts after failures. Rerunning either installer applies its updated unit and restarts the service. `--config /absolute/path/to/config.json` supports a custom runtime file.
 
-## Closing
+Open `http://<m1-ip>:8080`, sign in with **admin / admin** and change the password. Add a gateway using the identical 16-digit gateway ID, in the tenant that owns your devices. Select AU915 / `au915_1` and the device's correct LoRaWAN version and regional parameters revision for device profiles; configure nodes for FSB2 before joining.
 
-If the miner chapter is over, the hardware chapter doesn’t have to be.  
-This guide turns the M1 back into a working LoRaWAN gateway, your network, your rules.
+UDP 1700 and anonymous MQTT 1883 are published only on host loopback. Containers communicate through their private Compose network. The web UI is available on the LAN. For a remote gateway or external MQTT client, deliberately change bindings and configure access controls first.
 
-**Made in Phatthalung, Thailand.**
+```bash
+sudo systemctl status chirpstack-compose lora_pkt_fwd
+journalctl -u lora_pkt_fwd -f
+cd chirpstack-docker
+sudo docker compose ps
+sudo docker compose logs -f chirpstack chirpstack-gateway-bridge
+```
+
+`chirpstack-compose` is a oneshot unit: “active (exited)” means Compose was launched. Use `docker compose ps` and logs to check container health. Docker restarts containers after host restarts. The forwarder retries UDP delivery while the bridge starts.
+
+## Upgrading and backups
+
+### Moving from the original PostgreSQL / AS923 deployment
+
+This is a database backend change, **not an automatic database migration**. SQLite starts as a new network. Before checking out this refactor, stop the old forwarder, back up its JSON and `.env`, export network/device configuration and keys as appropriate, take a PostgreSQL dump, save the old Compose/config files and record the Git revision and image versions. Keep the existing PostgreSQL volume. Never use `docker compose down -v`.
+
+Stop the old stack with its old Compose file (`sudo docker compose down`, without `-v`) before updating the checkout. This also removes the old Basic Station, REST API and PostgreSQL containers while retaining volumes. Configure this fork using the **existing gateway ID**. For custom board calibration, copy the old known-good JSON into `/etc/sensecap-m1/global_conf.json` before running configure.sh; this applies FSB2 without replacing its other hardware or gateway settings. Commented JSON must first be converted to strict JSON. Check the destination is localhost:1700.
+
+Recreate tenants, applications, gateways and devices in SQLite through the UI or gRPC API, or use an explicitly tested export/import procedure. OTAA devices should join again. Plan ABP session/frame-counter migration explicitly before switching live devices. Configure devices for AU915 FSB2; AS923 devices do not become AU915 merely by changing the server. For rollback, stop the new stack, restore the old checkout/configuration and PostgreSQL backup/volume, and reinstall the old forwarder unit.
+
+### Routine SQLite deployment upgrades
+
+Stop both services and the containers before copying data so SQLite (including WAL files) and Redis are consistent. From the repository root:
+
+```bash
+sudo systemctl stop lora_pkt_fwd chirpstack-compose
+cd chirpstack-docker
+sudo docker compose stop
+# Redis writes a final snapshot on graceful shutdown.
+backup_dir="$HOME/sensecap-backup-$(date +%Y%m%d-%H%M%S)"
+mkdir -m 700 "$backup_dir"
+sudo tar -czf "$backup_dir/config-and-sqlite.tgz" \
+  .env configuration data /etc/sensecap-m1 /etc/systemd/system/lora_pkt_fwd.service \
+  /etc/systemd/system/chirpstack-compose.service
+redis_volume="$(sudo docker volume ls -q --filter label=com.docker.compose.project="$(basename "$PWD")" --filter label=com.docker.compose.volume=redisdata)"
+# If using a custom Compose project name, identify its redisdata volume with docker volume ls.
+test -n "$redis_volume"
+sudo docker run --rm -v "$redis_volume:/source:ro" \
+  -v "$backup_dir:/backup" alpine:3.21 tar -czf /backup/redis.tgz -C /source .
+sudo docker compose images > "$backup_dir/images.txt"
+cd ..
+git pull --ff-only
+sudo ./scripts/configure.sh
+./scripts/check-syntax.sh
+cd chirpstack-docker
+sudo docker compose pull
+cd ..
+sudo ./scripts/install-chirpstack-service.sh
+sudo ./scripts/install-lora-service.sh --user "$USER"
+```
+
+Keep backups private: they contain device keys and credentials. Back up SQLite and Redis together. Restore with both services stopped: extract the configuration/database archive to its original paths and the Redis archive into the matching `redisdata` volume, preserving ownership (SQLite UID/GID 65534), then start the services. Restore matching configuration and image versions too. Schema upgrades can prevent downgrades; rollback uses the **pre-upgrade backup**, not a newly migrated database.
+
+Images track major versions (`:4`, Redis `:7-alpine`, Mosquitto `:2`). Record deployed digests and pin tested tags/digests for controlled upgrades. Updating this checkout does not overwrite runtime gateway settings or the secret; review template changes and apply required changes to `/etc/sensecap-m1/global_conf.json` deliberately. Changing the API secret invalidates existing tokens.
+
+## Layout and validation
+
+```text
+packet_forwarder/global_conf_au915.json       # WM1302 calibration + FSB2 template
+packet_forwarder/reset_lgw.sh                # existing board GPIO mapping
+chirpstack-docker/docker-compose.yml
+chirpstack-docker/configuration/chirpstack/chirpstack.toml
+chirpstack-docker/configuration/chirpstack/region_au915_1.toml
+scripts/configure.sh                         # runtime JSON, secret, storage setup
+scripts/install-chirpstack-service.sh
+scripts/install-lora-service.sh
+scripts/check-syntax.sh
+systemd/                                    # service templates
+```
+
+`check-syntax.sh` requires Python 3.11+ and Docker Compose. It checks shell/Python syntax, parses JSON and TOML, verifies FSB2 frequencies/channel masks and matching MQTT prefixes, and runs full `docker compose config` validation. ShellCheck runs when installed and in CI. These checks do not prove SPI/GPIO access, RF performance or successful device joins; verify those on the M1 with gateway events and an OTAA uplink/downlink.

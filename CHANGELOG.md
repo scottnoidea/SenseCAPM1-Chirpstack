@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Australian private network
+
+- Target AU915 FSB2 (channels 8–15 and 65) throughout the WM1302 packet forwarder, ChirpStack and UDP Gateway Bridge.
+- Preserve gateway identity, radio calibration, TX gain table and board reset mapping.
+- Use the official ChirpStack SQLite image with persistent storage, Redis and Mosquitto; remove PostgreSQL, Basic Station, REST API and unused regional templates.
+- Add idempotent runtime configuration and Docker Compose systemd installers.
+- Validate JSON, TOML, Compose and channel/topic consistency; document installation, backups and database migration.
+
 All notable changes to this project are documented here.
 
 ## [2.0.0] — 2026-08-07

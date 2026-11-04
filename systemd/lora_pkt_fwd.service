@@ -9,7 +9,7 @@ Type=simple
 # Paths and User are filled by scripts/install-lora-service.sh
 # Or edit WorkingDirectory / ExecStart / User manually after install.
 WorkingDirectory=%h/SenseCAPM1-Chirpstack/packet_forwarder
-ExecStart=%h/SenseCAPM1-Chirpstack/packet_forwarder/lora_pkt_fwd -c %h/SenseCAPM1-Chirpstack/packet_forwarder/global_conf_as923_th.json
+ExecStart=%h/SenseCAPM1-Chirpstack/packet_forwarder/lora_pkt_fwd -c /etc/sensecap-m1/global_conf.json
 Restart=always
 RestartSec=30
 StandardOutput=journal
